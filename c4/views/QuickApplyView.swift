@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
-import SwiftySegmentedPicker
+import SegmentedPicker
+
 
 // MARK: - Relative Date Helpers
 
