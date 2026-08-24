@@ -90,13 +90,13 @@ jobs:
             puts 'Added Swift Package: Drops'
           end
 
-          # 🟢 3. สั่งเพิ่ม Swift Package (SwiftySegmentedPicker)
+          # 🟢 3. สั่งเพิ่ม Swift Package (SwiftySegmentedPicker) - แก้ไขการดึง branch main แทน version
           ssp_url = 'https://github.com/KazaiMazai/SwiftySegmentedPicker.git'
           ssp_ref = project.root_object.package_references.find { |p| p.repositoryURL == ssp_url }
           unless ssp_ref
             ssp_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
             ssp_ref.repositoryURL = ssp_url
-            ssp_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.0.0' }
+            ssp_ref.requirement = { 'kind' => 'branch', 'branch' => 'main' }
             project.root_object.package_references << ssp_ref
             
             ssp_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
