@@ -34,105 +34,105 @@ jobs:
       - name: sync swift files to xcodeproj
         run: |
           gem install xcodeproj
-          ruby -e "
-            require 'xcodeproj'
+          ruby << 'EOF'
+          require 'xcodeproj'
+          
+          project_path = Dir.glob('*.xcodeproj').first
+          unless project_path
+            puts 'No .xcodeproj found'
+            exit 1
+          end
+
+          project = Xcodeproj::Project.open(project_path)
+          target = project.targets.first
+
+          # 🟢 เพิ่ม Header Search Paths ให้ Xcode ค้นหาไฟล์ .h เจอในทุกโฟลเดอร์ย่อย
+          target.build_configurations.each do |config|
+            config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
+            paths = config.build_settings['HEADER_SEARCH_PATHS']
+            paths = [paths] if paths.is_a?(String)
+            unless paths.include?('$(SRCROOT)/**')
+              config.build_settings['HEADER_SEARCH_PATHS'] = paths + ['$(SRCROOT)/**']
+            end
+          end
+
+          # 🟢 1. สั่งเพิ่ม Swift Package (MBProgressHUD)
+          mbph_url = 'https://github.com/jdg/MBProgressHUD.git'
+          mbph_ref = project.root_object.package_references.find { |p| p.repositoryURL == mbph_url }
+          unless mbph_ref
+            mbph_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            mbph_ref.repositoryURL = mbph_url
+            mbph_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.2.0' }
+            project.root_object.package_references << mbph_ref
             
-            project_path = Dir.glob('*.xcodeproj').first
-            unless project_path
-              puts 'No .xcodeproj found'
-              exit 1
+            mbph_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            mbph_product_dependency.product_name = 'MBProgressHUD'
+            mbph_product_dependency.package = mbph_ref
+            
+            target.package_product_dependencies << mbph_product_dependency
+            puts 'Added Swift Package: MBProgressHUD'
+          end
+
+          # 🟢 2. สั่งเพิ่ม Swift Package (Drops)
+          drops_url = 'https://github.com/omaralbeik/Drops.git'
+          drops_ref = project.root_object.package_references.find { |p| p.repositoryURL == drops_url }
+          unless drops_ref
+            drops_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            drops_ref.repositoryURL = drops_url
+            drops_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.7.0' }
+            project.root_object.package_references << drops_ref
+            
+            drops_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            drops_product_dependency.product_name = 'Drops'
+            drops_product_dependency.package = drops_ref
+            
+            target.package_product_dependencies << drops_product_dependency
+            puts 'Added Swift Package: Drops'
+          end
+
+          # 🟢 3. สั่งเพิ่ม Swift Package (SwiftySegmentedPicker)
+          ssp_url = 'https://github.com/KazaiMazai/SwiftySegmentedPicker.git'
+          ssp_ref = project.root_object.package_references.find { |p| p.repositoryURL == ssp_url }
+          unless ssp_ref
+            ssp_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            ssp_ref.repositoryURL = ssp_url
+            ssp_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.0.0' }
+            project.root_object.package_references << ssp_ref
+            
+            ssp_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            ssp_product_dependency.product_name = 'SwiftySegmentedPicker'
+            ssp_product_dependency.package = ssp_ref
+            
+            target.package_product_dependencies << ssp_product_dependency
+            puts 'Added Swift Package: SwiftySegmentedPicker'
+          end
+
+          # 🟢 4. Sync ไฟล์ .swift, .m และ .h เข้า Compile Sources และ Project
+          source_phase = target.source_build_phase
+          existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
+
+          Dir.glob('**/*.{swift,m,h}').each do |source_file|
+            next if source_file.start_with?('Pods/', 'Build/', '.build/', 'DerivedData/')
+            
+            file_abs_path = File.expand_path(source_file)
+
+            file_ref = project.files.find { |f| f.real_path.to_s == file_abs_path }
+            unless file_ref
+              file_ref = project.main_group.new_file(source_file)
             end
 
-            project = Xcodeproj::Project.open(project_path)
-            target = project.targets.first
-
-            # 🟢 เพิ่ม Header Search Paths ให้ Xcode ค้นหาไฟล์ .h เจอในทุกโฟลเดอร์ย่อย
-            target.build_configurations.each do |config|
-              config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
-              paths = config.build_settings['HEADER_SEARCH_PATHS']
-              paths = [paths] if paths.is_a?(String)
-              unless paths.include?('$(SRCROOT)/**')
-                config.build_settings['HEADER_SEARCH_PATHS'] = paths + ['$(SRCROOT)/**']
+            if source_file.end_with?('.swift', '.m')
+              unless existing_files.include?(file_abs_path) || source_phase.files_references.include?(file_ref)
+                source_phase.add_file_reference(file_ref)
+                puts "Added to compile sources: #{source_file}"
               end
+            elsif source_file.end_with?('.h')
+              puts "Added header reference to project: #{source_file}"
             end
+          end
 
-            # 🟢 1. สั่งเพิ่ม Swift Package (MBProgressHUD)
-            mbph_url = 'https://github.com/jdg/MBProgressHUD.git'
-            mbph_ref = project.root_object.package_references.find { |p| p.repositoryURL == mbph_url }
-            unless mbph_ref
-              mbph_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
-              mbph_ref.repositoryURL = mbph_url
-              mbph_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.2.0' }
-              project.root_object.package_references << mbph_ref
-              
-              mbph_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
-              mbph_product_dependency.product_name = 'MBProgressHUD'
-              mbph_product_dependency.package = mbph_ref
-              
-              target.package_product_dependencies << mbph_product_dependency
-              puts 'Added Swift Package: MBProgressHUD'
-            end
-
-            # 🟢 2. สั่งเพิ่ม Swift Package (Drops)
-            drops_url = 'https://github.com/omaralbeik/Drops.git'
-            drops_ref = project.root_object.package_references.find { |p| p.repositoryURL == drops_url }
-            unless drops_ref
-              drops_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
-              drops_ref.repositoryURL = drops_url
-              drops_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.7.0' }
-              project.root_object.package_references << drops_ref
-              
-              drops_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
-              drops_product_dependency.product_name = 'Drops'
-              drops_product_dependency.package = drops_ref
-              
-              target.package_product_dependencies << drops_product_dependency
-              puts 'Added Swift Package: Drops'
-            end
-
-            # 🟢 3. สั่งเพิ่ม Swift Package (SwiftySegmentedPicker)
-            ssp_url = 'https://github.com/KazaiMazai/SwiftySegmentedPicker.git'
-            ssp_ref = project.root_object.package_references.find { |p| p.repositoryURL == ssp_url }
-            unless ssp_ref
-              ssp_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
-              ssp_ref.repositoryURL = ssp_url
-              ssp_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.0.0' }
-              project.root_object.package_references << ssp_ref
-              
-              ssp_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
-              ssp_product_dependency.product_name = 'SwiftySegmentedPicker'
-              ssp_product_dependency.package = ssp_ref
-              
-              target.package_product_dependencies << ssp_product_dependency
-              puts 'Added Swift Package: SwiftySegmentedPicker'
-            end
-
-            # 🟢 4. Sync ไฟล์ .swift, .m และ .h เข้า Compile Sources และ Project
-            source_phase = target.source_build_phase
-            existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
-
-            Dir.glob('**/*.{swift,m,h}').each do |source_file|
-              next if source_file.start_with?('Pods/', 'Build/', '.build/', 'DerivedData/')
-              
-              file_abs_path = File.expand_path(source_file)
-
-              file_ref = project.files.find { |f| f.real_path.to_s == file_abs_path }
-              unless file_ref
-                file_ref = project.main_group.new_file(source_file)
-              end
-
-              if source_file.end_with?('.swift', '.m')
-                unless existing_files.include?(file_abs_path) || source_phase.files_references.include?(file_ref)
-                  source_phase.add_file_reference(file_ref)
-                  puts "Added to compile sources: #{source_file}"
-                end
-              elsif source_file.end_with?('.h')
-                puts "Added header reference to project: #{source_file}"
-              end
-            end
-
-            project.save
-          "
+          project.save
+          EOF
 
       - name: build
         run: |
