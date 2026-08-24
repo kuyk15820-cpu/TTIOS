@@ -1,0 +1,67 @@
+name: Auto Unzip Any Archive
+
+on:
+  push:
+    paths:
+      - '**.zip'
+
+permissions:
+  contents: write
+
+jobs:
+  unzip-and-clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Extract all zip files to Root
+        run: |
+          for f in *.zip; do
+            [ -e "$f" ] || continue
+            echo "กำลังจัดการแตกไฟล์: $f"
+            
+            # เก็บชื่อไฟล์ดั้งเดิมแบบไม่มีนามสกุล .zip (เช่น Troll) ไว้ใช้ตรวจสอบโฟลเดอร์ย่อย
+            FOLDER_NAME="${f%.zip}"
+            
+            # แตกไฟล์ออกมาไว้ที่ root หลักตรงๆ
+            unzip -o "$f" -d ./
+            rm "$f"
+            
+            # ตรวจสอบว่าถ้าหากเกิดโฟลเดอร์ย่อยขึ้นมา (เช่นมีโฟลเดอร์ชื่อ Troll/ โผล่มาหลังแตกไฟล์)
+            if [ -d "$FOLDER_NAME" ]; then
+               echo "พบโฟลเดอร์ซ้อนชื่อ $FOLDER_NAME -> กำลังบังคับดึงไฟล์ภายในทั้งหมดออกมาที่หน้าแรก"
+               
+               # ดึงข้อมูลทุกอย่าง (รวมไฟล์ปกติและไฟล์ซ่อน) ออกมาที่หน้าแรกหลักของ Repo
+               mv "$FOLDER_NAME"/* ./ 2>/dev/null || true
+               mv "$FOLDER_NAME"/.* ./ 2>/dev/null || true
+               
+               # ลบตัวโฟลเดอร์เปล่าที่เหลือทิ้งไป
+               rm -rf "$FOLDER_NAME"
+            fi
+          done
+
+      - name: Fallback Check (For any other single nested folder)
+        run: |
+          # บล็อกสำรอง: หากชื่อโฟลเดอร์ย่อยไม่ตรงกับชื่อ zip แต่แตกมาแล้วดันมีแค่โฟลเดอร์เปล่าๆ ตัวเดียวหุ้มอยู่
+          TARGET_DIR=$(ls -d */ 2>/dev/null | grep -v -E '^(.git|.github)/$' | head -n 1)
+          NON_GIT_ITEMS=$(ls -1d */ * 2>/dev/null | grep -v -E '^(.git|.github)' | wc -l)
+          
+          if [ ! -z "$TARGET_DIR" ] && [ "$NON_GIT_ITEMS" -eq 1 ]; then
+             echo "Fallback: ตรวจพบโฟลเดอร์หุ้มชั้นนอกสุดชื่ออื่น: $TARGET_DIR -> กำลังเคลียร์ไฟล์ย่อยออกมา"
+             mv "$TARGET_DIR"* ./ 2>/dev/null || true
+             mv "$TARGET_DIR".* ./ 2>/dev/null || true
+             rm -rf "$TARGET_DIR"
+          fi
+
+      - name: Commit and Push Changes back to Repo
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Unpack and force flatten nested zip folder contents to root"
+            git push
+          else
+            echo "ไม่มีการเปลี่ยนแปลงโครงสร้างไฟล์เพิ่มเติม"
+          fi
