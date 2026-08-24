@@ -1,11 +1,12 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Native Segmented Picker Component
+// MARK: - Native Segmented Picker Component (Modern Capsule Pill Style)
 
 struct NativeSegmentedPicker: View {
     let items: [String]
     @Binding var selectedIndex: Int?
+    @Namespace private var categoryPickerAnimation
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -15,31 +16,34 @@ struct NativeSegmentedPicker: View {
                         let isSelected = selectedIndex == index
                         
                         Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                                 selectedIndex = index
                                 proxy.scrollTo(index, anchor: .center)
                             }
                         } label: {
-                            VStack(spacing: 6) {
-                                Text(item)
-                                    .font(.subheadline.bold())
-                                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-
-                                // เส้นไฮไลต์ด้านล่าง
-                                Rectangle()
-                                    .fill(isSelected ? AppTheme.accent : Color.clear)
-                                    .frame(height: 3)
-                                    .cornerRadius(1.5)
-                            }
+                            Text(item)
+                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                                .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.8))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background {
+                                    if isSelected {
+                                        Capsule()
+                                            .fill(AppTheme.accent)
+                                            .matchedGeometryEffect(id: "SEGMENTED_PICKER_INDICATOR", in: categoryPickerAnimation)
+                                            .shadow(color: AppTheme.accent.opacity(0.3), radius: 6, x: 0, y: 3)
+                                    } else {
+                                        Capsule()
+                                            .fill(Color(UIColor.secondarySystemFill))
+                                    }
+                                }
                         }
                         .buttonStyle(.plain)
-                        .contentShape(Rectangle()) // ขยายขอบเขตการรับแรงกดเต็มพื้นที่ปุ่ม
                         .id(index)
                     }
                 }
                 .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
         }
     }
@@ -205,10 +209,9 @@ struct QuickApplyView: View {
             items: availableCategories,
             selectedIndex: $selectedCategoryIndex
         )
-        .padding(.vertical, 4)
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color(UIColor.systemBackground))
         .overlay(
-            Divider().background(Color.secondary.opacity(0.2)),
+            Divider().background(Color.secondary.opacity(0.15)),
             alignment: .bottom
         )
     }
