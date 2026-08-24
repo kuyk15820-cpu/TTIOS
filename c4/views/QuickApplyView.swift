@@ -1,7 +1,49 @@
 import SwiftUI
 import UIKit
-import SegmentedPicker
 
+// MARK: - Native Segmented Picker Component
+
+struct NativeSegmentedPicker: View {
+    let items: [String]
+    @Binding var selectedIndex: Int?
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        let isSelected = selectedIndex == index
+                        
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedIndex = index
+                                proxy.scrollTo(index, anchor: .center)
+                            }
+                        } label: {
+                            VStack(spacing: 6) {
+                                Text(item)
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+
+                                // เส้นไฮไลต์ด้านล่าง
+                                Rectangle()
+                                    .fill(isSelected ? AppTheme.accent : Color.clear)
+                                    .frame(height: 3)
+                                    .cornerRadius(1.5)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .contentShape(Rectangle()) // ขยายขอบเขตการรับแรงกดเต็มพื้นที่ปุ่ม
+                        .id(index)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+}
 
 // MARK: - Relative Date Helpers
 
@@ -156,38 +198,19 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - SegmentedPicker Category Filter Bar
+    // MARK: - Native Category Filter Bar
 
     private var categoryFilterBar: some View {
-        SegmentedPicker(
-            availableCategories,
-            selectedIndex: $selectedCategoryIndex,
-            selectionAlignment: .bottom,
-            content: { category, isSelected in
-                Text(category)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-            },
-            selection: {
-                VStack(spacing: 0) {
-                    Spacer()
-                    Rectangle()
-                        .fill(AppTheme.accent)
-                        .frame(height: 3)
-                        .cornerRadius(1.5)
-                }
-            }
+        NativeSegmentedPicker(
+            items: availableCategories,
+            selectedIndex: $selectedCategoryIndex
         )
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
         .background(Color(UIColor.systemGroupedBackground))
         .overlay(
             Divider().background(Color.secondary.opacity(0.2)),
             alignment: .bottom
         )
-        .animation(.easeInOut(duration: 0.25), value: selectedCategoryIndex)
     }
 
     // MARK: - Patch Catalog Section
