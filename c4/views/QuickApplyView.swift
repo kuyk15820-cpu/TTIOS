@@ -127,7 +127,7 @@ struct SegmentedFilterBar: UIViewRepresentable {
             contentView.layer.cornerRadius = 16
             contentView.layer.masksToBounds = true
 
-            NSLayoutConstraints.activate([
+            NSLayoutConstraint.activate([
                 titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
                 titleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
                 titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
