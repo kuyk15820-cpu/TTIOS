@@ -51,8 +51,8 @@ struct QuickApplyView: View {
     @State private var activePatches: [String: Bool] = [:]
     @State private var selectedItems: Set<String> = []
     
-    // หมวดหมู่ที่เลือก (Default เป็น "ทั้งหมด")
-    @State private var selectedCategory: String = "ทั้งหมด"
+    // Index ของหมวดหมู่ที่เลือก (Default เป็น Index 0: "ทั้งหมด")
+    @State private var selectedCategoryIndex: Int? = 0
     
     @State private var isLoadingCatalog = false
     @State private var processingItemID: String?
@@ -80,6 +80,14 @@ struct QuickApplyView: View {
             }
         }
         return categories
+    }
+
+    // อ่านค่า String หมวดหมู่ที่กำลังเลือกอยู่
+    private var selectedCategory: String {
+        guard let index = selectedCategoryIndex, availableCategories.indices.contains(index) else {
+            return "ทั้งหมด"
+        }
+        return availableCategories[index]
     }
 
     // รายการ Patch ที่จะนำไปแสดงใน UI list ตาม Category ที่เลือกอยู่
@@ -153,18 +161,23 @@ struct QuickApplyView: View {
     private var categoryFilterBar: some View {
         SegmentedPicker(
             availableCategories,
-            selection: $selectedCategory,
-            itemContent: { category in
+            selectedIndex: $selectedCategoryIndex,
+            selectionAlignment: .bottom,
+            content: { category, isSelected in
                 Text(category)
                     .font(.subheadline.bold())
+                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
             },
-            selectionIndicator: {
-                Rectangle()
-                    .fill(AppTheme.accent)
-                    .frame(height: 3)
-                    .cornerRadius(1.5)
+            selection: {
+                VStack(spacing: 0) {
+                    Spacer()
+                    Rectangle()
+                        .fill(AppTheme.accent)
+                        .frame(height: 3)
+                        .cornerRadius(1.5)
+                }
             }
         )
         .padding(.horizontal, 16)
@@ -174,6 +187,7 @@ struct QuickApplyView: View {
             Divider().background(Color.secondary.opacity(0.2)),
             alignment: .bottom
         )
+        .animation(.easeInOut(duration: 0.25), value: selectedCategoryIndex)
     }
 
     // MARK: - Patch Catalog Section
