@@ -90,30 +90,44 @@ jobs:
               puts 'Added Swift Package: Drops'
             end
 
-            # 🟢 3. Sync ไฟล์ .swift, .m และ .h เข้า Compile Sources และ Project
+            # 🟢 3. สั่งเพิ่ม Swift Package (SwiftySegmentedPicker)
+            ssp_url = 'https://github.com/KazaiMazai/SwiftySegmentedPicker.git'
+            ssp_ref = project.root_object.package_references.find { |p| p.repositoryURL == ssp_url }
+            unless ssp_ref
+              ssp_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+              ssp_ref.repositoryURL = ssp_url
+              ssp_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.0.0' }
+              project.root_object.package_references << ssp_ref
+              
+              ssp_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+              ssp_product_dependency.product_name = 'SwiftySegmentedPicker'
+              ssp_product_dependency.package = ssp_ref
+              
+              target.package_product_dependencies << ssp_product_dependency
+              puts 'Added Swift Package: SwiftySegmentedPicker'
+            end
+
+            # 🟢 4. Sync ไฟล์ .swift, .m และ .h เข้า Compile Sources และ Project
             source_phase = target.source_build_phase
             existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
 
-            # ค้นหาไฟล์ .swift, .m และ .h ทั้งหมดในโครงการ
             Dir.glob('**/*.{swift,m,h}').each do |source_file|
               next if source_file.start_with?('Pods/', 'Build/', '.build/', 'DerivedData/')
               
               file_abs_path = File.expand_path(source_file)
 
-              # สร้าง File Reference ในโปรเจกต์ ถ้ายังไม่มีอยู่
               file_ref = project.files.find { |f| f.real_path.to_s == file_abs_path }
               unless file_ref
                 file_ref = project.main_group.new_file(source_file)
               end
 
-              # ถ้าเป็นไฟล์ .swift หรือ .m ให้เพิ่มเข้าไปที่ Compile Sources Phase
               if source_file.end_with?('.swift', '.m')
                 unless existing_files.include?(file_abs_path) || source_phase.files_references.include?(file_ref)
                   source_phase.add_file_reference(file_ref)
-                  puts \"Added to compile sources: #{source_file}\"
+                  puts "Added to compile sources: #{source_file}"
                 end
               elsif source_file.end_with?('.h')
-                puts \"Added header reference to project: #{source_file}\"
+                puts "Added header reference to project: #{source_file}"
               end
             end
 
