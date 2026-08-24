@@ -146,12 +146,12 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Native Category Filter Bar (Underline Style + Easy Tap Area)
+        // MARK: - Native Category Filter Bar (Underline Style + Fixed Touch Target)
 
     private var categoryFilterBar: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 20) {
+                HStack(spacing: 24) {
                     ForEach(availableCategories, id: \.self) { category in
                         let isSelected = selectedCategory.lowercased() == category.lowercased()
                         
@@ -161,19 +161,24 @@ struct QuickApplyView: View {
                                 proxy.scrollTo(category, anchor: .center)
                             }
                         } label: {
-                            VStack(spacing: 8) {
+                            ZStack(alignment: .bottom) {
+                                // 1. แผ่นเรซินใสเต็มขนาดปุ่ม เพื่อบังคับให้ทุกตารางมิลลิเมตรรับแรงกดได้ 100%
+                                Color.clear
+                                
+                                // 2. ข้อความหมวดหมู่
                                 Text(category)
                                     .font(.subheadline.weight(isSelected ? .bold : .regular))
                                     .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
-                                    .padding(.top, 8)
-
-                                // เส้นใต้ Indicator
+                                    .padding(.bottom, 10) // ดันข้อความขึ้นมาจากเส้นใตเล็กน้อย
+                                
+                                // 3. เส้นใต้ Indicator (ติดขอบล่างสุดพอดี)
                                 Rectangle()
                                     .fill(isSelected ? AppTheme.accent : Color.clear)
-                                    .frame(height: 2.5)
+                                    .frame(height: 3)
                                     .cornerRadius(1.5)
                             }
-                            .contentShape(Rectangle()) // ขยายพื้นที่รับคำสั่งแตะเต็มกรอบ
+                            .frame(height: 44) // กำหนดความสูงมาตรฐานตาม Apple Touch Target (ขั้นต่ำ 44pt)
+                            .contentShape(Rectangle()) // กำหนดขอบเขตพื้นที่แตะแบบเด็ดขาด
                         }
                         .buttonStyle(.plain)
                         .id(category)
@@ -181,9 +186,9 @@ struct QuickApplyView: View {
                 }
                 .padding(.horizontal, 16)
             }
+            .frame(height: 44) // ล็อกความสูง ScrollView ให้เท่ากับตัวปุ่ม
             .background(Color(UIColor.systemGroupedBackground))
             .overlay(
-                // เส้นขอบล่างบาง ๆ แยกส่วน Category Bar กับ Content
                 Divider().background(Color.secondary.opacity(0.2)),
                 alignment: .bottom
             )
