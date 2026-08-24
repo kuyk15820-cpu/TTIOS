@@ -41,122 +41,6 @@ struct QuickPatchItem: Identifiable, Codable {
     }
 }
 
-// MARK: - Native CollectionView Segmented Control Component
-
-struct SegmentedFilterBar: UIViewRepresentable {
-    let categories: [String]
-    @Binding var selectedCategory: String
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    func makeUIView(context: Context) -> UICollectionView {
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        layout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
-        layout.minimumInteritemSpacing = 8
-        layout.sectionInset = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
-
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.backgroundColor = .systemGroupedBackground
-        collectionView.showsHorizontalScrollIndicator = false
-        collectionView.dataSource = context.coordinator
-        collectionView.delegate = context.coordinator
-        collectionView.register(SegmentCell.self, forCellWithReuseIdentifier: SegmentCell.identifier)
-
-        return collectionView
-    }
-
-    func updateUIView(_ uiView: UICollectionView, context: Context) {
-        context.coordinator.parent = self
-        uiView.reloadData()
-    }
-
-    // MARK: - Coordinator (Delegate & DataSource)
-
-    class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
-        var parent: SegmentedFilterBar
-
-        init(_ parent: SegmentedFilterBar) {
-            self.parent = parent
-        }
-
-        func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-            return parent.categories.count
-        }
-
-        func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: SegmentCell.identifier, for: indexPath) as? SegmentCell else {
-                return UICollectionViewCell()
-            }
-            let category = parent.categories[indexPath.item]
-            let isSelected = parent.selectedCategory.lowercased() == category.lowercased()
-            cell.configure(title: category, isSelected: isSelected)
-            return cell
-        }
-
-        func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-            let selected = parent.categories[indexPath.item]
-            
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                parent.selectedCategory = selected
-            }
-            
-            collectionView.reloadData()
-            collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
-        }
-    }
-
-    // MARK: - Custom UICollectionViewCell
-
-    private class SegmentCell: UICollectionViewCell {
-        static let identifier = "SegmentCell"
-
-        private let titleLabel: UILabel = {
-            let label = UILabel()
-            label.font = .systemFont(ofSize: 14, weight: .bold)
-            label.textAlignment = .center
-            label.translatesAutoresizingMaskIntoConstraints = false
-            return label
-        }()
-
-        override init(frame: CGRect) {
-            super.init(frame: frame)
-            contentView.addSubview(titleLabel)
-            contentView.layer.cornerRadius = 16
-            contentView.layer.masksToBounds = true
-
-            NSLayoutConstraint.activate([
-                titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
-                titleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
-                titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
-                titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14)
-            ])
-        }
-
-        required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-
-        func configure(title: String, isSelected: Bool) {
-            titleLabel.text = title
-            
-            if isSelected {
-                contentView.backgroundColor = UIColor(AppTheme.accent)
-                titleLabel.textColor = .white
-                contentView.layer.borderWidth = 1.5
-                contentView.layer.borderColor = UIColor.white.cgColor
-            } else {
-                contentView.backgroundColor = UIColor.secondaryLabel.withAlphaComponent(0.15)
-                titleLabel.textColor = .label
-                contentView.layer.borderWidth = 0
-                contentView.layer.borderColor = UIColor.clear.cgColor
-            }
-        }
-    }
-}
-
 // MARK: - QuickApplyView
 
 struct QuickApplyView: View {
@@ -268,11 +152,43 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Category Filter Bar Component
+    // MARK: - Native Category Filter Bar Component
 
     private var categoryFilterBar: some View {
-        SegmentedFilterBar(categories: availableCategories, selectedCategory: $selectedCategory)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(availableCategories, id: \.self) { category in
+                        let isSelected = selectedCategory.lowercased() == category.lowercased()
+                        
+                        Text(category)
+                            .font(.subheadline.bold())
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(isSelected ? AppTheme.accent : Color.secondary.opacity(0.15))
+                            )
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(isSelected ? Color.white : Color.clear, lineWidth: 1.5)
+                            )
+                            .foregroundStyle(isSelected ? .white : .primary)
+                            .id(category)
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    selectedCategory = category
+                                    proxy.scrollTo(category, anchor: .center)
+                                }
+                            }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
             .frame(height: 50)
+            .background(Color(UIColor.systemGroupedBackground))
+        }
     }
 
     // MARK: - Patch Catalog Section
