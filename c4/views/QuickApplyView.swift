@@ -153,41 +153,41 @@ struct QuickApplyView: View {
 
     // MARK: - Category Filter Bar Component
 
-    private var categoryFilterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(availableCategories, id: \.self) { cat in
-                    let isSelected = selectedCategory.lowercased() == cat.lowercased()
-                    
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedCategory = cat
-                        }
-                    } label: {
-                        Text(cat)
-                            .font(.subheadline.bold())
-                            .foregroundStyle(isSelected ? Color.white : Color.primary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .allowsHitTesting(false)
+    // MARK: - Category Filter Bar Component
+
+private var categoryFilterBar: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 8) {
+            ForEach(availableCategories, id: \.self) { cat in
+                let isSelected = selectedCategory.lowercased() == cat.lowercased()
+                
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectedCategory = cat
                     }
-                    .buttonStyle(.plain)
-                    .background(
-                        Capsule()
-                            .fill(isSelected ? AppTheme.accent : Color.secondary.opacity(0.15))
-                    )
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(isSelected ? Color.white : Color.clear, lineWidth: 1.5)
-                    )
-                    .contentShape(Capsule())
+                } label: {
+                    Text(cat)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(isSelected ? Color.white : Color.primary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? AppTheme.accent : Color.secondary.opacity(0.15))
+                        )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(isSelected ? Color.white : Color.clear, lineWidth: 1.5)
+                        )
                 }
+                .buttonStyle(PlainButtonStyle())
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
+    .background(Color(uiColor: .systemGroupedBackground))
+}
 
     // MARK: - Patch Catalog Section
 
