@@ -90,7 +90,7 @@ jobs:
             puts 'Added Swift Package: Drops'
           end
 
-          # 🟢 3. สั่งเพิ่ม Swift Package (SwiftySegmentedPicker) - แก้ไขการดึง branch main แทน version
+          # 🟢 3. สั่งเพิ่ม Swift Package (SwiftySegmentedPicker -> Product Name: SegmentedPicker)
           ssp_url = 'https://github.com/KazaiMazai/SwiftySegmentedPicker.git'
           ssp_ref = project.root_object.package_references.find { |p| p.repositoryURL == ssp_url }
           unless ssp_ref
@@ -100,11 +100,12 @@ jobs:
             project.root_object.package_references << ssp_ref
             
             ssp_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
-            ssp_product_dependency.product_name = 'SwiftySegmentedPicker'
+            # 💡 แก้ไขเป็น SegmentedPicker ให้ตรงกับที่ Library ประกาศไว้ใน Package.swift
+            ssp_product_dependency.product_name = 'SegmentedPicker'
             ssp_product_dependency.package = ssp_ref
             
             target.package_product_dependencies << ssp_product_dependency
-            puts 'Added Swift Package: SwiftySegmentedPicker'
+            puts 'Added Swift Package: SegmentedPicker'
           end
 
           # 🟢 4. Sync ไฟล์ .swift, .m และ .h เข้า Compile Sources และ Project
