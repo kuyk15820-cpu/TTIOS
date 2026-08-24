@@ -6,15 +6,10 @@ import UIKit
 extension String {
     /// แปลงข้อความวันเวลา (ISO 8601) เป็นเวลาเปรียบเทียบ เช่น "เมื่อสักครู่", "5 นาทีที่แล้ว"
     var toRelativeTimeText: String {
-        // Parse ISO 8601 string แปลงเป็น Date ด้วย Native Strategy
         guard let date = try? Date(self, strategy: .iso8601) else {
             return self
         }
-        
-        // ดักกรณีเวลาล้ำหน้าเวลาเครื่อง iOS (จากปัญหา Timezone ของ Server) ให้ปัดเป็นเวลาปัจจุบันทันที
         let safeDate = min(date, Date())
-        
-        // กำหนดภาษาไทยให้ FormatStyle
         return safeDate.formatted(.relative(presentation: .named).locale(Locale(identifier: "th_TH")))
     }
 }
@@ -35,7 +30,6 @@ struct QuickPatchItem: Identifiable, Codable {
         if let cat = category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !cat.isEmpty {
             return cat == "aim"
         }
-        // Fallback กรณีข้อมูลไม่สมบูรณ์
         let text = "\(id) \(title)".lowercased()
         return text.contains("aim") || text.contains("ลาก") || text.contains("หัว")
     }
@@ -152,42 +146,47 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Native Category Filter Bar Component
+    // MARK: - Native Category Filter Bar (Underline Style + Easy Tap Area)
 
     private var categoryFilterBar: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 20) {
                     ForEach(availableCategories, id: \.self) { category in
                         let isSelected = selectedCategory.lowercased() == category.lowercased()
                         
-                        Text(category)
-                            .font(.subheadline.bold())
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(isSelected ? AppTheme.accent : Color.secondary.opacity(0.15))
-                            )
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(isSelected ? Color.white : Color.clear, lineWidth: 1.5)
-                            )
-                            .foregroundStyle(isSelected ? .white : .primary)
-                            .id(category)
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    selectedCategory = category
-                                    proxy.scrollTo(category, anchor: .center)
-                                }
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedCategory = category
+                                proxy.scrollTo(category, anchor: .center)
                             }
+                        } label: {
+                            VStack(spacing: 8) {
+                                Text(category)
+                                    .font(.subheadline.weight(isSelected ? .bold : .regular))
+                                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
+                                    .padding(.top, 8)
+
+                                // เส้นใต้ Indicator
+                                Rectangle()
+                                    .fill(isSelected ? AppTheme.accent : Color.clear)
+                                    .frame(height: 2.5)
+                                    .cornerRadius(1.5)
+                            }
+                            .contentShape(Rectangle()) // ขยายพื้นที่รับคำสั่งแตะเต็มกรอบ
+                        }
+                        .buttonStyle(.plain)
+                        .id(category)
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
             }
-            .frame(height: 50)
             .background(Color(UIColor.systemGroupedBackground))
+            .overlay(
+                // เส้นขอบล่างบาง ๆ แยกส่วน Category Bar กับ Content
+                Divider().background(Color.secondary.opacity(0.2)),
+                alignment: .bottom
+            )
         }
     }
 
@@ -205,7 +204,6 @@ struct QuickApplyView: View {
                 
                 Spacer()
                 
-                // ปุ่มเลือกทั้งหมด (เลือก Aim เพียงรายการแรก + หมวดหมู่อื่นทั้งหมด)
                 Button {
                     toggleSelectAll()
                 } label: {
@@ -227,7 +225,6 @@ struct QuickApplyView: View {
         let isServerActive = item.active ?? true
 
         HStack(alignment: .center, spacing: 8) {
-            // 1. ปุ่มหลักฝั่งซ้าย (ชื่อและเวลาอัปเดต)
             Button {
                 if isServerActive && processingItemID == nil && !isRestoringAll && !isProcessingBatch {
                     if selectedItems.isEmpty {
@@ -269,7 +266,6 @@ struct QuickApplyView: View {
 
             Spacer(minLength: 4)
 
-            // 2. แคปซูล "ปิดปรับปรุง"
             if !isServerActive {
                 Text("ปิดปรับปรุง")
                     .font(.caption2.bold())
@@ -285,7 +281,6 @@ struct QuickApplyView: View {
                     .opacity(1.0)
             }
 
-            // 3. ไอคอน SF Checkmark อยู่ขวาสุด
             if isServerActive || isApplied {
                 Button {
                     if processingItemID == nil && !isRestoringAll && !isProcessingBatch {
@@ -324,7 +319,6 @@ struct QuickApplyView: View {
     private var bottomActionButtons: some View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
-                // ปุ่มคืนค่าเดิมทั้งหมด
                 Button {
                     restoreAllPatches()
                 } label: {
@@ -349,7 +343,6 @@ struct QuickApplyView: View {
                 .disabled(!hasActivePatches || processingItemID != nil || isRestoringAll || isProcessingBatch || isLoadingCatalog)
                 .opacity(hasActivePatches ? 1.0 : 0.4)
 
-                // ปุ่มเปิดเกม
                 Button {
                     openGame()
                 } label: {
@@ -373,7 +366,6 @@ struct QuickApplyView: View {
                 .disabled(processingItemID != nil || isRestoringAll || isProcessingBatch || isLoadingCatalog)
             }
 
-            // ปุ่ม Patch หลายรายการ
             if !selectedItems.isEmpty {
                 Button {
                     applyBatchPatches()
@@ -410,7 +402,6 @@ struct QuickApplyView: View {
         if selectedItems.contains(item.id) {
             selectedItems.remove(item.id)
         } else {
-            // หากเลือกรายการประเภท Aim จะล้าง Aim ตัวอื่นออกจาก selectedItems ทันที
             if item.isAimCategory {
                 let currentAimIDs = filteredGamePatches.filter { $0.isAimCategory }.map { $0.id }
                 selectedItems.subtract(currentAimIDs)
@@ -439,12 +430,10 @@ struct QuickApplyView: View {
         } else {
             var newSelection = Set<String>()
             
-            // 1. เลือก Aim เพียงรายการแรกรายการเดียวเท่านั้น
             if let firstAim = availableItems.first(where: { $0.isAimCategory }) {
                 newSelection.insert(firstAim.id)
             }
             
-            // 2. เลือกรายการหมวดหมู่อื่น ๆ ทั้งหมด (เช่น Hologram)
             let nonAimItems = availableItems.filter { !$0.isAimCategory }
             for item in nonAimItems {
                 newSelection.insert(item.id)
@@ -620,7 +609,6 @@ struct QuickApplyView: View {
                 }
 
                 if enable {
-                    // หากเปิดใช้ Aim ตัวใหม่ สั่ง Restore และ Uncheck Aim ตัวเดิมบน UI ทันที
                     if item.isAimCategory {
                         let activeAimItems = await self.filteredGamePatches.filter { $0.isAimCategory && $0.id != item.id }
                         for aimItem in activeAimItems {
