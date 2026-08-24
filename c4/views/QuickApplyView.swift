@@ -39,6 +39,7 @@ struct NativeSegmentedPicker: View {
                                 }
                         }
                         .buttonStyle(.plain)
+                        .contentShape(Capsule()) // กำหนดขอบเขตพื้นที่สัมผัสเป็นทรงแคปซูลแบบเต็มพื้นที่
                         .id(index)
                     }
                 }
