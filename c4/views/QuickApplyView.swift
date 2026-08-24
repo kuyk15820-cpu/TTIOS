@@ -148,10 +148,10 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - SwiftySegmentedPicker Category Filter Bar
+    // MARK: - SegmentedPicker Category Filter Bar
 
     private var categoryFilterBar: some View {
-        SwiftySegmentedPicker(
+        SegmentedPicker(
             availableCategories,
             selection: $selectedCategory,
             itemContent: { category in
