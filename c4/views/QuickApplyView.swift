@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import SwiftySegmentedPicker
 
 // MARK: - Relative Date Helpers
 
@@ -146,53 +147,32 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-        // MARK: - Native Category Filter Bar (Underline Style + Fixed Touch Target)
+    // MARK: - SwiftySegmentedPicker Category Filter Bar
 
     private var categoryFilterBar: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 24) {
-                    ForEach(availableCategories, id: \.self) { category in
-                        let isSelected = selectedCategory.lowercased() == category.lowercased()
-                        
-                        Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                selectedCategory = category
-                                proxy.scrollTo(category, anchor: .center)
-                            }
-                        } label: {
-                            ZStack(alignment: .bottom) {
-                                // 1. แผ่นเรซินใสเต็มขนาดปุ่ม เพื่อบังคับให้ทุกตารางมิลลิเมตรรับแรงกดได้ 100%
-                                Color.clear
-                                
-                                // 2. ข้อความหมวดหมู่
-                                Text(category)
-                                    .font(.subheadline.weight(isSelected ? .bold : .regular))
-                                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
-                                    .padding(.bottom, 10) // ดันข้อความขึ้นมาจากเส้นใตเล็กน้อย
-                                
-                                // 3. เส้นใต้ Indicator (ติดขอบล่างสุดพอดี)
-                                Rectangle()
-                                    .fill(isSelected ? AppTheme.accent : Color.clear)
-                                    .frame(height: 3)
-                                    .cornerRadius(1.5)
-                            }
-                            .frame(height: 44) // กำหนดความสูงมาตรฐานตาม Apple Touch Target (ขั้นต่ำ 44pt)
-                            .contentShape(Rectangle()) // กำหนดขอบเขตพื้นที่แตะแบบเด็ดขาด
-                        }
-                        .buttonStyle(.plain)
-                        .id(category)
-                    }
-                }
-                .padding(.horizontal, 16)
+        SwiftySegmentedPicker(
+            availableCategories,
+            selection: $selectedCategory,
+            itemContent: { category in
+                Text(category)
+                    .font(.subheadline.bold())
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+            },
+            selectionIndicator: {
+                Rectangle()
+                    .fill(AppTheme.accent)
+                    .frame(height: 3)
+                    .cornerRadius(1.5)
             }
-            .frame(height: 44) // ล็อกความสูง ScrollView ให้เท่ากับตัวปุ่ม
-            .background(Color(UIColor.systemGroupedBackground))
-            .overlay(
-                Divider().background(Color.secondary.opacity(0.2)),
-                alignment: .bottom
-            )
-        }
+        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(Color(UIColor.systemGroupedBackground))
+        .overlay(
+            Divider().background(Color.secondary.opacity(0.2)),
+            alignment: .bottom
+        )
     }
 
     // MARK: - Patch Catalog Section
