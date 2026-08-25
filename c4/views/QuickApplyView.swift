@@ -81,10 +81,8 @@ struct QuickApplyView: View {
     @State private var activePatches: [String: Bool] = [:]
     @State private var selectedItems: Set<String> = []
     
-    // Index ของหมวดหมู่ที่เลือก (ใช้ Int เพื่อผูกกับ TabView Paging)
-    @State private var selectedCategoryIndex: Int = 0
-    // State สำหรับควบคุมโหมดเลือกหลายรายการ
-    @State private var isMultiSelectMode: Bool = false
+    // Index ของหมวดหมู่ที่เลือก (Default เป็น Index 0: "ทั้งหมด")
+    @State private var selectedCategoryIndex: Int? = 0
     
     @State private var isLoadingCatalog = false
     @State private var processingItemID: String?
@@ -114,19 +112,37 @@ struct QuickApplyView: View {
         return categories
     }
 
-    // รายการ Patch ตามหมวดหมู่ที่ระบุ
-    private func patches(for category: String) -> [QuickPatchItem] {
-        if category == "ทั้งหมด" {
+    // อ่านค่า String หมวดหมู่ที่กำลังเลือกอยู่
+    private var selectedCategory: String {
+        guard let index = selectedCategoryIndex, availableCategories.indices.contains(index) else {
+            return "ทั้งหมด"
+        }
+        return availableCategories[index]
+    }
+
+    // รายการ Patch ที่จะนำไปแสดงใน UI list ตาม Category ที่เลือกอยู่
+    private var displayedPatches: [QuickPatchItem] {
+        if selectedCategory == "ทั้งหมด" {
             return filteredGamePatches
         }
         return filteredGamePatches.filter {
-            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == category.lowercased()
+            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == selectedCategory.lowercased()
         }
+    }
+
+    // นับจำนวน Patch ที่เปิดใช้งานอยู่ (active != false) ในรายการที่กำลังแสดงผล
+    private var activeDisplayedPatchesCount: Int {
+        displayedPatches.filter { $0.active ?? true }.count
     }
 
     // เช็คว่ามี Patch ไหนเปิดใช้งานอยู่หรือไม่
     private var hasActivePatches: Bool {
         activePatches.values.contains(true)
+    }
+
+    // รายการที่เปิดให้ทำงานบน Server ได้ในเกมปัจจุบัน
+    private var availableItems: [QuickPatchItem] {
+        filteredGamePatches.filter { $0.active ?? true }
     }
 
     private func countForCategory(_ category: String) -> Int? {
@@ -144,23 +160,12 @@ struct QuickApplyView: View {
                 categoryFilterBar
             }
 
-            if isLoadingCatalog {
-                Spacer()
-                ProgressView()
-                Spacer()
-            } else {
-                // TabView สไตล์ Paging สำหรับปัดซ้าย-ขวา
-                TabView(selection: $selectedCategoryIndex) {
-                    ForEach(Array(availableCategories.enumerated()), id: \.offset) { index, category in
-                        List {
-                            patchCatalogSection(for: patches(for: category))
-                        }
-                        .listStyle(.plain)
-                        .tag(index)
-                    }
+            List {
+                if !isLoadingCatalog {
+                    patchCatalogSection
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
             }
+            .listStyle(.plain)
             
             if !filteredGamePatches.isEmpty && !isLoadingCatalog {
                 bottomActionButtons
@@ -190,11 +195,11 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Category Filter Bar (Auto-scroll ตามการปัดหน้า)
+    // MARK: - Category Filter Bar (Replaced with AnalysisTabView Filter Style)
 
     private var categoryFilterBar: some View {
         VStack(spacing: 0) {
-            ScrollViewReader { proxy in
+            HStack(spacing: 8) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 4) {
                         ForEach(Array(availableCategories.enumerated()), id: \.offset) { index, category in
@@ -203,64 +208,48 @@ struct QuickApplyView: View {
                                 isSelected: selectedCategoryIndex == index,
                                 count: countForCategory(category)
                             ) {
-                                withAnimation {
-                                    selectedCategoryIndex = index
-                                }
+                                selectedCategoryIndex = index
                             }
-                            .id(index)
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
                 }
-                .onChange(of: selectedCategoryIndex) { newIndex in
-                    withAnimation {
-                        proxy.scrollTo(newIndex, anchor: .center)
+
+                Button {
+                    toggleSelectAll()
+                } label: {
+                    HStack(spacing: 4) {
+                        let allSelected = isAllSmartSelected()
+                        if !selectedItems.isEmpty {
+                            Image(systemName: allSelected ? "checkmark.circle" : "circle")
+                                .font(.caption.bold())
+                        }
+                        Text("เลือกหลายรายการ")
                     }
+                    .font(.subheadline.weight(!selectedItems.isEmpty ? .semibold : .regular))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(!selectedItems.isEmpty ? Color.accentColor.opacity(0.15) : Color.clear)
+                    .foregroundColor(!selectedItems.isEmpty ? .accentColor : .secondary)
+                    .clipShape(Capsule())
                 }
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
             .background(Color(.systemBackground))
 
             Divider()
         }
     }
 
-    // MARK: - Patch Catalog Section (แคปซูล เลือกหลายรายการ + ไม่มี Header Text)
+    // MARK: - Patch Catalog Section
 
     @ViewBuilder
-    private func patchCatalogSection(for items: [QuickPatchItem]) -> some View {
+    private var patchCatalogSection: some View {
         Section {
-            ForEach(items) { item in
+            ForEach(displayedPatches) { item in
                 patchRow(for: item)
             }
-        } header: {
-            HStack {
-                Spacer()
-                
-                // ปุ่มแคปซูล "เลือกหลายรายการ"
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isMultiSelectMode.toggle()
-                        if !isMultiSelectMode {
-                            selectedItems.removeAll()
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: isMultiSelectMode ? "checkmark.circle.fill" : "plus.circle")
-                            .font(.caption.bold())
-                        Text(isMultiSelectMode ? "ยกเลิกเลือกหลายรายการ" : "เลือกหลายรายการ")
-                            .font(.caption.bold())
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(isMultiSelectMode ? AppTheme.accent.opacity(0.15) : Color.secondary.opacity(0.12))
-                    .foregroundStyle(isMultiSelectMode ? AppTheme.accent : .primary)
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.vertical, 2)
         }
     }
 
@@ -273,10 +262,10 @@ struct QuickApplyView: View {
         HStack(alignment: .center, spacing: 8) {
             Button {
                 if isServerActive && processingItemID == nil && !isRestoringAll && !isProcessingBatch {
-                    if isMultiSelectMode {
-                        toggleSelection(for: item)
-                    } else {
+                    if selectedItems.isEmpty {
                         handleToggleChange(item: item, enable: !isApplied)
+                    } else {
+                        toggleSelection(for: item)
                     }
                 }
             } label: {
@@ -327,43 +316,42 @@ struct QuickApplyView: View {
                     .opacity(1.0)
             }
 
-            // แสดง Icon ตามสถานะโหมด Multi-Select และ การติดตั้ง
-            if isMultiSelectMode {
-                // อยู่ในโหมดเลือกหลายรายการ: แสดงวงกลมสำหรับให้ User ติ๊กเลือกเอง
+            if isServerActive || isApplied {
                 Button {
-                    if isServerActive && processingItemID == nil && !isRestoringAll && !isProcessingBatch {
-                        toggleSelection(for: item)
+                    if processingItemID == nil && !isRestoringAll && !isProcessingBatch {
+                        if !isServerActive && isApplied {
+                            handleToggleChange(item: item, enable: false)
+                        } else if selectedItems.isEmpty {
+                            handleToggleChange(item: item, enable: !isApplied)
+                        } else {
+                            toggleSelection(for: item)
+                        }
                     }
                 } label: {
                     ZStack {
-                        if isSelected {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.title2)
-                                .foregroundStyle(AppTheme.accent)
+                        if !selectedItems.isEmpty {
+                            if isSelected {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.title2)
+                                    .foregroundStyle(AppTheme.accent)
+                            } else {
+                                Image(systemName: "circle")
+                                    .font(.title2)
+                                    .foregroundStyle(.tertiary)
+                            }
                         } else {
-                            Image(systemName: "circle")
-                                .font(.title2)
-                                .foregroundStyle(.tertiary)
+                            if isApplied {
+                                Image(systemName: "checkmark")
+                                    .font(.headline)
+                                    .foregroundStyle(AppTheme.accent)
+                            }
                         }
                     }
                     .frame(width: 28, height: 28, alignment: .center)
                 }
                 .buttonStyle(.plain)
-                .disabled(!isServerActive || processingItemID != nil || isRestoringAll || isProcessingBatch)
-            } else if isApplied {
-                // ไม่ได้อยู่ในโหมดเลือกหลายรายการ: แสดงเฉพาะเครื่องหมาย Checkmark เมื่อใช้งานอยู่
-                Button {
-                    if processingItemID == nil && !isRestoringAll && !isProcessingBatch {
-                        handleToggleChange(item: item, enable: false)
-                    }
-                } label: {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(AppTheme.accent)
-                        .frame(width: 28, height: 28, alignment: .center)
-                }
-                .buttonStyle(.plain)
-                .disabled(processingItemID != nil || isRestoringAll || isProcessingBatch)
+                .disabled((!isServerActive && !isApplied) || processingItemID != nil || isRestoringAll || isProcessingBatch)
+                .opacity(1.0)
             }
         }
         .padding(.vertical, 4)
@@ -462,6 +450,26 @@ struct QuickApplyView: View {
                 selectedItems.subtract(currentAimIDs)
             }
             selectedItems.insert(item.id)
+        }
+    }
+
+    private func isAllSmartSelected() -> Bool {
+        guard !availableItems.isEmpty else { return false }
+        
+        let firstAim = availableItems.first(where: { $0.isAimCategory })
+        let otherItems = availableItems.filter { !$0.isAimCategory }
+        
+        var expectedIDs = Set(otherItems.map { $0.id })
+        if let aim = firstAim {
+            expectedIDs.insert(aim.id)
+        }
+        
+        return selectedItems == expectedIDs
+    }
+
+    private func toggleSelectAll() {
+        if !selectedItems.isEmpty {
+            selectedItems.removeAll()
         }
     }
 
@@ -768,7 +776,6 @@ struct QuickApplyView: View {
             await MainActor.run {
                 self.isProcessingBatch = false
                 self.selectedItems.removeAll()
-                self.isMultiSelectMode = false
                 if finalSuccessCount > 0 {
                     self.showSuccessNotification(message: "ติดตั้ง Patch (\(finalSuccessCount) รายการ) เรียบร้อยแล้ว")
                 } else {
@@ -808,7 +815,6 @@ struct QuickApplyView: View {
             await MainActor.run {
                 self.isRestoringAll = false
                 self.selectedItems.removeAll()
-                self.isMultiSelectMode = false
                 if finalCount > 0 {
                     self.showSuccessNotification(message: "คืนค่า Patch ต้นฉบับเรียบร้อยแล้ว")
                 } else {
