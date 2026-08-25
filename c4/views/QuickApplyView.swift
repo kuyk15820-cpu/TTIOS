@@ -35,40 +35,6 @@ struct QuickPatchItem: Identifiable, Codable {
     }
 }
 
-// MARK: - Tab Button Component (Fixed Touch Target)
-
-struct TabButton: View {
-    let title: String
-    let isSelected: Bool
-    var count: Int?
-    let action: () -> Void
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Text(title)
-            if let count = count {
-                Text("\(count)")
-                    .font(.caption2.bold())
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(isSelected ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.15))
-                    .clipShape(Capsule())
-            }
-        }
-        .font(.subheadline.weight(isSelected ? .semibold : .regular))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
-        .foregroundColor(isSelected ? .accentColor : .secondary)
-        .clipShape(Capsule())
-        // ครอบคลุมพื้นที่ Hit-Test ทั้งหมดอย่างถูกต้อง
-        .contentShape(Rectangle()) 
-        .onTapGesture {
-            action()
-        }
-    }
-}
-
 // MARK: - QuickApplyView
 
 struct QuickApplyView: View {
@@ -83,8 +49,8 @@ struct QuickApplyView: View {
     @State private var activePatches: [String: Bool] = [:]
     @State private var selectedItems: Set<String> = []
     
-    // เปลี่ยนจาก Index (Int?) มาใช้ String ID โดยตรง อ้างอิงตามไฟล์ตัวอย่าง 2
-    @State private var selectedCategory: String = "ทั้งหมด"
+    // Index ของหมวดหมู่ที่เลือก (Default เป็น Index 0: "ทั้งหมด")
+    @State private var selectedCategoryIndex: Int = 0
     
     @State private var isLoadingCatalog = false
     @State private var processingItemID: String?
@@ -114,19 +80,22 @@ struct QuickApplyView: View {
         return categories
     }
 
-    // รายการ Patch ที่จะนำไปแสดงใน UI list ตาม Category ที่เลือกอยู่
-    private var displayedPatches: [QuickPatchItem] {
-        if selectedCategory == "ทั้งหมด" {
+    // อ่านค่า String หมวดหมู่ที่กำลังเลือกอยู่
+    private var selectedCategory: String {
+        guard availableCategories.indices.contains(selectedCategoryIndex) else {
+            return "ทั้งหมด"
+        }
+        return availableCategories[selectedCategoryIndex]
+    }
+
+    // ดึง Patch แยกตามชื่อหมวดหมู่
+    private func patches(for category: String) -> [QuickPatchItem] {
+        if category == "ทั้งหมด" {
             return filteredGamePatches
         }
         return filteredGamePatches.filter {
-            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == selectedCategory.lowercased()
+            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == category.lowercased()
         }
-    }
-
-    // นับจำนวน Patch ที่เปิดใช้งานอยู่ (active != false) ในรายการที่กำลังแสดงผล
-    private var activeDisplayedPatchesCount: Int {
-        displayedPatches.filter { $0.active ?? true }.count
     }
 
     // เช็คว่ามี Patch ไหนเปิดใช้งานอยู่หรือไม่
@@ -139,36 +108,43 @@ struct QuickApplyView: View {
         filteredGamePatches.filter { $0.active ?? true }
     }
 
-    private func countForCategory(_ category: String) -> Int? {
-        if category == "ทั้งหมด" {
-            return filteredGamePatches.count
-        }
-        return filteredGamePatches.filter {
-            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == category.lowercased()
-        }.count
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            if !isLoadingCatalog && availableCategories.count > 1 {
-                categoryFilterBar
-            }
-
-            List {
-                if !isLoadingCatalog {
-                    patchCatalogSection
+            if !isLoadingCatalog {
+                TabView(selection: $selectedCategoryIndex) {
+                    ForEach(Array(availableCategories.enumerated()), id: \.offset) { index, category in
+                        let categoryPatches = patches(for: category)
+                        
+                        List {
+                            patchCatalogSection(for: categoryPatches)
+                        }
+                        .listStyle(.plain)
+                        .tag(index)
+                    }
                 }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+            } else {
+                Spacer()
             }
-            .listStyle(.plain)
             
             if !filteredGamePatches.isEmpty && !isLoadingCatalog {
                 bottomActionButtons
             }
         }
-        .navigationTitle(selectedApp.name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.accent)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 1) {
+                    Text(selectedApp.name)
+                        .font(.headline)
+                        .foregroundStyle(Color.primary)
+                    
+                    Text("หมวดหมู่: \(selectedCategory)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { showLogs = true } label: {
                     Image(systemName: "apple.terminal")
@@ -189,45 +165,19 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Category Filter Bar (Fixed Identity)
-
-    private var categoryFilterBar: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
-        HStack(spacing: 4) {
-            ForEach(availableCategories, id: \.self) { category in
-                TabButton(
-                    title: category,
-                    isSelected: selectedCategory == category,
-                    count: countForCategory(category)
-                ) {
-                    selectedCategory = category
-                }
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-    }
-    .background(Color(.systemBackground))
-    // ใช้ overlay ทำเส้นใต้แทน Divider() เพื่อไม่ให้ Layout Frame ของ ScrollView เพี้ยน
-    .overlay(
-        Rectangle()
-            .frame(height: 1)
-            .foregroundColor(Color(.separator)),
-        alignment: .bottom
-    )
-}
-
     // MARK: - Patch Catalog Section
 
     @ViewBuilder
-    private var patchCatalogSection: some View {
+    private func patchCatalogSection(for items: [QuickPatchItem]) -> some View {
+        let activeCount = items.filter { $0.active ?? true }.count
+        
         Section {
-            ForEach(displayedPatches) { item in
+            ForEach(items) { item in
                 patchRow(for: item)
             }
         } header: {
             HStack {
-                Text("รายการ Patch ที่พร้อมใช้งาน (\(activeDisplayedPatchesCount))")
+                Text("รายการ Patch ที่พร้อมใช้งาน (\(activeCount))")
                 
                 Spacer()
                 
