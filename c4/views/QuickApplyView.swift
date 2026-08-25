@@ -156,10 +156,6 @@ struct QuickApplyView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isLoadingCatalog && availableCategories.count > 1 {
-                categoryFilterBar
-            }
-
             List {
                 if !isLoadingCatalog {
                     patchCatalogSection
@@ -169,6 +165,12 @@ struct QuickApplyView: View {
             
             if !filteredGamePatches.isEmpty && !isLoadingCatalog {
                 bottomActionButtons
+            }
+        }
+        // ติดตั้ง Filter ไว้ภายนอก VStack หลักผ่าน safeAreaInset เพื่อให้ลอยอยู่บนสุดแบบนุ่มนวล
+        .safeAreaInset(edge: .top) {
+            if !isLoadingCatalog && availableCategories.count > 1 {
+                categoryFilterBar
             }
         }
         .navigationTitle(selectedApp.name)
@@ -195,51 +197,26 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Category Filter Bar (Replaced with AnalysisTabView Filter Style)
+    // MARK: - Category Filter Bar (ปรับแต่งตามโจทย์: ไว้นอก VStack, ขยับลงมา และลบ Divider)
 
     private var categoryFilterBar: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(Array(availableCategories.enumerated()), id: \.offset) { index, category in
-                            TabButton(
-                                title: category,
-                                isSelected: selectedCategoryIndex == index,
-                                count: countForCategory(category)
-                            ) {
-                                selectedCategoryIndex = index
-                            }
-                        }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                ForEach(Array(availableCategories.enumerated()), id: \.offset) { index, category in
+                    TabButton(
+                        title: category,
+                        isSelected: selectedCategoryIndex == index,
+                        count: countForCategory(category)
+                    ) {
+                        selectedCategoryIndex = index
                     }
                 }
-
-                Button {
-                    toggleSelectAll()
-                } label: {
-                    HStack(spacing: 4) {
-                        let allSelected = isAllSmartSelected()
-                        if !selectedItems.isEmpty {
-                            Image(systemName: allSelected ? "checkmark.circle" : "circle")
-                                .font(.caption.bold())
-                        }
-                        Text("เลือกหลายรายการ")
-                    }
-                    .font(.subheadline.weight(!selectedItems.isEmpty ? .semibold : .regular))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(!selectedItems.isEmpty ? Color.accentColor.opacity(0.15) : Color.clear)
-                    .foregroundColor(!selectedItems.isEmpty ? .accentColor : .secondary)
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
-            .background(Color(.systemBackground))
-
-            Divider()
         }
+        .background(Color(.systemBackground))
+        .padding(.top, 8) // เพิ่มขยับลงมาจากขอบบน/NavigationBar
     }
 
     // MARK: - Patch Catalog Section
@@ -249,6 +226,23 @@ struct QuickApplyView: View {
         Section {
             ForEach(displayedPatches) { item in
                 patchRow(for: item)
+            }
+        } header: {
+            HStack {
+                Text("รายการ Patch ที่พร้อมใช้งาน (\(activeDisplayedPatchesCount))")
+                
+                Spacer()
+                
+                Button {
+                    toggleSelectAll()
+                } label: {
+                    let allSelected = isAllSmartSelected()
+                    Image(systemName: allSelected ? "checkmark.circle" : "circle")
+                        .font(.title2)
+                        .foregroundStyle(allSelected ? AppTheme.accent : .secondary)
+                }
+                .buttonStyle(.plain)
+                .frame(width: 28, height: 28, alignment: .center)
             }
         }
     }
@@ -329,22 +323,14 @@ struct QuickApplyView: View {
                     }
                 } label: {
                     ZStack {
-                        if !selectedItems.isEmpty {
-                            if isSelected {
-                                Image(systemName: "checkmark.circle")
-                                    .font(.title2)
-                                    .foregroundStyle(AppTheme.accent)
-                            } else {
-                                Image(systemName: "circle")
-                                    .font(.title2)
-                                    .foregroundStyle(.tertiary)
-                            }
+                        if isSelected || (selectedItems.isEmpty && isApplied) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.title2)
+                                .foregroundStyle(AppTheme.accent)
                         } else {
-                            if isApplied {
-                                Image(systemName: "checkmark")
-                                    .font(.headline)
-                                    .foregroundStyle(AppTheme.accent)
-                            }
+                            Image(systemName: "circle")
+                                .font(.title2)
+                                .foregroundStyle(.tertiary)
                         }
                     }
                     .frame(width: 28, height: 28, alignment: .center)
@@ -468,8 +454,21 @@ struct QuickApplyView: View {
     }
 
     private func toggleSelectAll() {
-        if !selectedItems.isEmpty {
+        if isAllSmartSelected() {
             selectedItems.removeAll()
+        } else {
+            var newSelection = Set<String>()
+            
+            if let firstAim = availableItems.first(where: { $0.isAimCategory }) {
+                newSelection.insert(firstAim.id)
+            }
+            
+            let nonAimItems = availableItems.filter { !$0.isAimCategory }
+            for item in nonAimItems {
+                newSelection.insert(item.id)
+            }
+            
+            selectedItems = newSelection
         }
     }
 
