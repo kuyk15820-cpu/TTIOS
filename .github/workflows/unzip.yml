@@ -151,7 +151,7 @@ jobs:
           project.save
           EOF
 
-      # 🟢 6. อัปเดต Path การดึง binary จาก swiftshield_tmp/bin/swiftshield
+      # 🟢 6. ติดตั้ง SwiftShield และทดสอบคำสั่งด้วย --help (แทนการใช้ -v)
       - name: install and run swiftshield
         run: |
           curl -L https://github.com/rockbruno/swiftshield/releases/latest/download/swiftshield.zip -o swiftshield.zip
@@ -160,7 +160,7 @@ jobs:
           sudo chmod +x swiftshield_tmp/bin/swiftshield
           sudo mv swiftshield_tmp/bin/swiftshield /usr/local/bin/
           rm -rf swiftshield.zip swiftshield_tmp
-          swiftshield -v
+          swiftshield --help
 
       - name: build
         run: |
