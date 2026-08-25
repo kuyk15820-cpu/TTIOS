@@ -151,14 +151,14 @@ jobs:
           project.save
           EOF
 
-      # 🟢 6. แตกไฟล์ลงโฟลเดอร์ชั่วคราว (-o ทับไฟล์เดิมอัตโนมัติ) และติดตั้งลง /usr/local/bin
+      # 🟢 6. อัปเดต Path การดึง binary จาก swiftshield_tmp/bin/swiftshield
       - name: install and run swiftshield
         run: |
           curl -L https://github.com/rockbruno/swiftshield/releases/latest/download/swiftshield.zip -o swiftshield.zip
           unzip -o swiftshield.zip -d swiftshield_tmp
           sudo mkdir -p /usr/local/bin
-          sudo chmod +x swiftshield_tmp/swiftshield
-          sudo mv swiftshield_tmp/swiftshield /usr/local/bin/
+          sudo chmod +x swiftshield_tmp/bin/swiftshield
+          sudo mv swiftshield_tmp/bin/swiftshield /usr/local/bin/
           rm -rf swiftshield.zip swiftshield_tmp
           swiftshield -v
 
