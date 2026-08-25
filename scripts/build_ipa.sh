@@ -18,13 +18,15 @@ SCHEME_NAME="$TARGET_NAME"
 echo "Auto-generating scheme for Target: $SCHEME_NAME..."
 xcodebuild -project "$PROJECT_FILE" -scheme "$SCHEME_NAME" -manageAutomaticSchemes >/dev/null 2>&1 || true
 
-# 1. สั่ง Archive
+# 1. สั่ง Archive (เพิ่ม Flag ปลดล็อก Swift Macro & Plugin Validation)
 xcodebuild \
   -project "$PROJECT_FILE" \
   -scheme "$SCHEME_NAME" \
   -configuration Release \
   -destination 'generic/platform=iOS' \
   -archivePath "$PWD/build/$PROJECT_NAME.xcarchive" \
+  -skipPackagePluginValidation \
+  -skipMacroValidation \
   archive \
   CODE_SIGN_IDENTITY="" \
   CODE_SIGNING_REQUIRED=NO \
