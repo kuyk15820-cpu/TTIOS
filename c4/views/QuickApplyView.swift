@@ -580,6 +580,8 @@ struct QuickApplyView: View {
 
                             let hasReceipt = DevicePatchService.latestReceipt(projectID: decoded.project.id) != nil
                             self.activePatches[item.id] = hasReceipt
+                        } else {
+                            self.activePatches[item.id] = false
                         }
                     }
                 }
@@ -636,6 +638,7 @@ struct QuickApplyView: View {
                 }
 
                 if enable {
+                    // ปลดล็อกหมวดหมู่ Aim อื่นถ้ามี และเคลียร์ Receipt เก่าออกแบบเงียบๆ
                     if item.isAimCategory {
                         let activeAimItems = await self.filteredGamePatches.filter { $0.isAimCategory && $0.id != item.id }
                         for aimItem in activeAimItems {
@@ -645,14 +648,25 @@ struct QuickApplyView: View {
                             if let aimURL = await self.localPatchURL(for: aimItem.id),
                                FileManager.default.fileExists(atPath: aimURL.path),
                                let packageData = try? Data(contentsOf: aimURL),
-                               let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil),
-                               let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
+                               let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil) {
                                 
-                                try? DevicePatchService.restore(receipt: receipt)
+                                if let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
+                                    try? DevicePatchService.restore(receipt: receipt)
+                                }
+                                try? FileManager.default.removeItem(at: aimURL)
                             }
                         }
                     }
 
+                    // สั่งถอนการติดตั้ง Patch เดิมของตัวเองก่อน หากมีไฟล์เก่าค้างอยู่
+                    if FileManager.default.fileExists(atPath: applyURL.path),
+                       let existingData = try? Data(contentsOf: applyURL),
+                       let existingDecoded = try? PatchPackageCodec.decode(existingData, password: nil),
+                       let existingReceipt = DevicePatchService.latestReceipt(projectID: existingDecoded.project.id) {
+                        try? DevicePatchService.restore(receipt: existingReceipt)
+                    }
+
+                    // ดาวน์โหลดและทำการ Apply Patch ใหม่
                     try await self.downloadFile(from: item.downloadUrl, to: applyURL)
 
                     let packageData = try Data(contentsOf: applyURL)
@@ -667,18 +681,17 @@ struct QuickApplyView: View {
                     }
 
                 } else {
-                    guard FileManager.default.fileExists(atPath: applyURL.path) else {
-                        throw PatchPackageError.invalidProject
+                    // กรณีสั่งถอน Patch (Restore)
+                    if FileManager.default.fileExists(atPath: applyURL.path) {
+                        if let packageData = try? Data(contentsOf: applyURL),
+                           let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil),
+                           let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
+                            // พยายามย้อนคืนไฟล์ตาม Receipt
+                            try? DevicePatchService.restore(receipt: receipt)
+                        }
+                        // ลบไฟล์ท้องถิ่นออกเพื่อล้างสถานะ
+                        try? FileManager.default.removeItem(at: applyURL)
                     }
-
-                    let packageData = try Data(contentsOf: applyURL)
-                    let decodedPackage = try PatchPackageCodec.decode(packageData, password: nil)
-
-                    guard let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) else {
-                        throw PatchPackageError.invalidProject
-                    }
-
-                    try DevicePatchService.restore(receipt: receipt)
 
                     await MainActor.run {
                         self.activePatches[item.id] = false
@@ -695,7 +708,7 @@ struct QuickApplyView: View {
             } catch {
                 await MainActor.run {
                     self.processingItemID = nil
-                    let message = enable ? "ไม่สามารถใช้งาน Patch ได้ ระบบได้ทำการยกเลิกการเขียนไฟล์ก่อนหน้าทั้งหมดแล้ว" : "ไม่สามารถคืนค่าไฟล์ต้นฉบับได้อย่างปลอดภัย ไม่มีเป้าหมายที่ไม่ได้รับการยืนยันถูกเขียนทับ"
+                    let message = enable ? "ไม่สามารถใช้งาน Patch ได้ ระบบได้ทำการยกเลิกการเขียนไฟล์ก่อนหน้าทั้งหมดแล้ว" : "ไม่สามารถคืนค่าไฟล์ต้นฉบับได้"
                     self.showErrorNotification(message: message)
                 }
             }
@@ -723,12 +736,21 @@ struct QuickApplyView: View {
                             if let aimURL = await self.localPatchURL(for: aimItem.id),
                                FileManager.default.fileExists(atPath: aimURL.path),
                                let packageData = try? Data(contentsOf: aimURL),
-                               let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil),
-                               let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
+                               let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil) {
                                 
-                                try? DevicePatchService.restore(receipt: receipt)
+                                if let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
+                                    try? DevicePatchService.restore(receipt: receipt)
+                                }
+                                try? FileManager.default.removeItem(at: aimURL)
                             }
                         }
+                    }
+
+                    if FileManager.default.fileExists(atPath: applyURL.path),
+                       let existingData = try? Data(contentsOf: applyURL),
+                       let existingDecoded = try? PatchPackageCodec.decode(existingData, password: nil),
+                       let existingReceipt = DevicePatchService.latestReceipt(projectID: existingDecoded.project.id) {
+                        try? DevicePatchService.restore(receipt: existingReceipt)
                     }
 
                     try await self.downloadFile(from: item.downloadUrl, to: applyURL)
@@ -768,19 +790,21 @@ struct QuickApplyView: View {
             let currentItems = await self.filteredGamePatches
 
             for item in currentItems {
-                guard let applyURL = await self.localPatchURL(for: item.id),
-                      FileManager.default.fileExists(atPath: applyURL.path),
-                      let packageData = try? Data(contentsOf: applyURL),
-                      let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil),
-                      let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) else {
-                    continue
+                guard let applyURL = await self.localPatchURL(for: item.id) else { continue }
+
+                if FileManager.default.fileExists(atPath: applyURL.path) {
+                    if let packageData = try? Data(contentsOf: applyURL),
+                       let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil),
+                       let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
+                        if (try? DevicePatchService.restore(receipt: receipt)) != nil {
+                            count += 1
+                        }
+                    }
+                    try? FileManager.default.removeItem(at: applyURL)
                 }
 
-                if (try? DevicePatchService.restore(receipt: receipt)) != nil {
-                    count += 1
-                    await MainActor.run {
-                        self.activePatches[item.id] = false
-                    }
+                await MainActor.run {
+                    self.activePatches[item.id] = false
                 }
             }
 
@@ -790,6 +814,8 @@ struct QuickApplyView: View {
                 self.selectedItems.removeAll()
                 if finalCount > 0 {
                     self.showSuccessNotification(message: "คืนค่า Patch ต้นฉบับเรียบร้อยแล้ว")
+                } else {
+                    self.showSuccessNotification(message: "รีเซ็ตสถานะคืนค่าเดิมทั้งหมดเรียบร้อยแล้ว")
                 }
             }
         }
