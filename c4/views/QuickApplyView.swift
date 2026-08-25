@@ -44,27 +44,30 @@ struct TabButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Text(title)
-                if let count = count {
-                    Text("\(count)")
-                        .font(.caption2.bold())
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(isSelected ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.15))
-                        .clipShape(Capsule())
-                }
+        HStack(spacing: 4) {
+            Text(title)
+            if let count = count {
+                Text("\(count)")
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(isSelected ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.15))
+                    .clipShape(Capsule())
             }
-            .font(.subheadline.weight(isSelected ? .semibold : .regular))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
-            .foregroundColor(isSelected ? .accentColor : .secondary)
-            .clipShape(Capsule())
-            .contentShape(Capsule()) // แก้ไข: กำหนดพื้นที่รับ Hit-Test ให้เต็มปุ่ม
         }
-        .buttonStyle(.plain)
+        .font(.subheadline.weight(isSelected ? .semibold : .regular))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+        .foregroundColor(isSelected ? .accentColor : .secondary)
+        .clipShape(Capsule())
+        .contentShape(Capsule())
+        //  ใช้ TapGesture แบบ simultaneous แทน Button ปกติ เพื่อแซง Gesture ของ List
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                action()
+            }
+        )
     }
 }
 
