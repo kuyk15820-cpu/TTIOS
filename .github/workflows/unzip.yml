@@ -100,7 +100,6 @@ jobs:
             project.root_object.package_references << ssp_ref
             
             ssp_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
-            # 💡 แก้ไขเป็น SegmentedPicker ให้ตรงกับที่ Library ประกาศไว้ใน Package.swift
             ssp_product_dependency.product_name = 'SegmentedPicker'
             ssp_product_dependency.package = ssp_ref
             
@@ -108,7 +107,24 @@ jobs:
             puts 'Added Swift Package: SegmentedPicker'
           end
 
-          # 🟢 4. Sync ไฟล์ .swift, .m และ .h เข้า Compile Sources และ Project
+          # 🟢 4. สั่งเพิ่ม Swift Package (ObfuscateMacro)
+          obfuscate_url = 'https://github.com/p-x9/ObfuscateMacro.git'
+          obfuscate_ref = project.root_object.package_references.find { |p| p.repositoryURL == obfuscate_url }
+          unless obfuscate_ref
+            obfuscate_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            obfuscate_ref.repositoryURL = obfuscate_url
+            obfuscate_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '0.1.0' }
+            project.root_object.package_references << obfuscate_ref
+            
+            obfuscate_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            obfuscate_product_dependency.product_name = 'ObfuscateMacro'
+            obfuscate_product_dependency.package = obfuscate_ref
+            
+            target.package_product_dependencies << obfuscate_product_dependency
+            puts 'Added Swift Package: ObfuscateMacro'
+          end
+
+          # 🟢 5. Sync ไฟล์ .swift, .m และ .h เข้า Compile Sources และ Project
           source_phase = target.source_build_phase
           existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
 
@@ -134,6 +150,12 @@ jobs:
 
           project.save
           EOF
+
+      # 🟢 6. ติดตั้งและรัน SwiftShield หลังทำการซิงก์โปรเจกต์เรียบร้อยแล้ว
+      - name: install and run swiftshield
+        run: |
+          brew install swiftshield
+          swiftshield -v
 
       - name: build
         run: |
