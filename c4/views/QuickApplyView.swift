@@ -1,55 +1,6 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Native Segmented Picker Component (Modern Capsule Pill Style)
-
-struct NativeSegmentedPicker: View {
-    let items: [String]
-    @Binding var selectedIndex: Int?
-    @Namespace private var categoryPickerAnimation
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                        let isSelected = selectedIndex == index
-                        
-                        Button {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                selectedIndex = index
-                                proxy.scrollTo(index, anchor: .center)
-                            }
-                        } label: {
-                            Text(item)
-                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                                .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.8))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background {
-                                    if isSelected {
-                                        Capsule()
-                                            .fill(AppTheme.accent)
-                                            .matchedGeometryEffect(id: "SEGMENTED_PICKER_INDICATOR", in: categoryPickerAnimation)
-                                            .shadow(color: AppTheme.accent.opacity(0.3), radius: 6, x: 0, y: 3)
-                                    } else {
-                                        Capsule()
-                                            .fill(Color(UIColor.secondarySystemFill))
-                                    }
-                                }
-                        }
-                        .buttonStyle(.plain)
-                        .contentShape(Capsule()) // กำหนดขอบเขตพื้นที่สัมผัสเป็นทรงแคปซูลแบบเต็มพื้นที่
-                        .id(index)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
-        }
-    }
-}
-
 // MARK: - Relative Date Helpers
 
 extension String {
@@ -81,6 +32,38 @@ struct QuickPatchItem: Identifiable, Codable {
         }
         let text = "\(id) \(title)".lowercased()
         return text.contains("aim") || text.contains("ลาก") || text.contains("หัว")
+    }
+}
+
+// MARK: - Tab Button Component (From AnalysisTabView)
+
+struct TabButton: View {
+    let title: String
+    let isSelected: Bool
+    var count: Int?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(title)
+                if let count = count {
+                    Text("\(count)")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(isSelected ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+            .font(.subheadline.weight(isSelected ? .semibold : .regular))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+            .foregroundColor(isSelected ? .accentColor : .secondary)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -162,6 +145,15 @@ struct QuickApplyView: View {
         filteredGamePatches.filter { $0.active ?? true }
     }
 
+    private func countForCategory(_ category: String) -> Int? {
+        if category == "ทั้งหมด" {
+            return filteredGamePatches.count
+        }
+        return filteredGamePatches.filter {
+            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == category.lowercased()
+        }.count
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if !isLoadingCatalog && availableCategories.count > 1 {
@@ -203,18 +195,29 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Native Category Filter Bar
+    // MARK: - Category Filter Bar (Replaced with AnalysisTabView Filter Style)
 
     private var categoryFilterBar: some View {
-        NativeSegmentedPicker(
-            items: availableCategories,
-            selectedIndex: $selectedCategoryIndex
-        )
-        .background(Color(UIColor.systemBackground))
-        .overlay(
-            Divider().background(Color.secondary.opacity(0.15)),
-            alignment: .bottom
-        )
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(Array(availableCategories.enumerated()), id: \.offset) { index, category in
+                        TabButton(
+                            title: category,
+                            isSelected: selectedCategoryIndex == index,
+                            count: countForCategory(category)
+                        ) {
+                            selectedCategoryIndex = index
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+            .background(Color(.systemBackground))
+
+            Divider()
+        }
     }
 
     // MARK: - Patch Catalog Section
