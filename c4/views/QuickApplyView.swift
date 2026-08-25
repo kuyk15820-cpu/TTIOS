@@ -61,13 +61,11 @@ struct TabButton: View {
         .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
         .foregroundColor(isSelected ? .accentColor : .secondary)
         .clipShape(Capsule())
-        .contentShape(Capsule())
-        //  ใช้ TapGesture แบบ simultaneous แทน Button ปกติ เพื่อแซง Gesture ของ List
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                action()
-            }
-        )
+        // ครอบคลุมพื้นที่ Hit-Test ทั้งหมดอย่างถูกต้อง
+        .contentShape(Rectangle()) 
+        .onTapGesture {
+            action()
+        }
     }
 }
 
@@ -194,27 +192,30 @@ struct QuickApplyView: View {
     // MARK: - Category Filter Bar (Fixed Identity)
 
     private var categoryFilterBar: some View {
-        VStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(availableCategories, id: \.self) { category in
-                        TabButton(
-                            title: category,
-                            isSelected: selectedCategory == category,
-                            count: countForCategory(category)
-                        ) {
-                            selectedCategory = category
-                        }
-                    }
+    ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 4) {
+            ForEach(availableCategories, id: \.self) { category in
+                TabButton(
+                    title: category,
+                    isSelected: selectedCategory == category,
+                    count: countForCategory(category)
+                ) {
+                    selectedCategory = category
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
             }
-            .background(Color(.systemBackground))
-
-            Divider()
         }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
     }
+    .background(Color(.systemBackground))
+    // ใช้ overlay ทำเส้นใต้แทน Divider() เพื่อไม่ให้ Layout Frame ของ ScrollView เพี้ยน
+    .overlay(
+        Rectangle()
+            .frame(height: 1)
+            .foregroundColor(Color(.separator)),
+        alignment: .bottom
+    )
+}
 
     // MARK: - Patch Catalog Section
 
