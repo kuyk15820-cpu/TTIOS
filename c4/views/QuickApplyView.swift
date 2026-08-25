@@ -35,7 +35,7 @@ struct QuickPatchItem: Identifiable, Codable {
     }
 }
 
-// MARK: - Tab Button Component (From AnalysisTabView)
+// MARK: - Tab Button Component (Fixed Touch Target)
 
 struct TabButton: View {
     let title: String
@@ -62,6 +62,7 @@ struct TabButton: View {
             .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
             .foregroundColor(isSelected ? .accentColor : .secondary)
             .clipShape(Capsule())
+            .contentShape(Capsule()) // แก้ไข: กำหนดพื้นที่รับ Hit-Test ให้เต็มปุ่ม
         }
         .buttonStyle(.plain)
     }
@@ -81,8 +82,8 @@ struct QuickApplyView: View {
     @State private var activePatches: [String: Bool] = [:]
     @State private var selectedItems: Set<String> = []
     
-    // Index ของหมวดหมู่ที่เลือก (Default เป็น Index 0: "ทั้งหมด")
-    @State private var selectedCategoryIndex: Int? = 0
+    // เปลี่ยนจาก Index (Int?) มาใช้ String ID โดยตรง อ้างอิงตามไฟล์ตัวอย่าง 2
+    @State private var selectedCategory: String = "ทั้งหมด"
     
     @State private var isLoadingCatalog = false
     @State private var processingItemID: String?
@@ -110,14 +111,6 @@ struct QuickApplyView: View {
             }
         }
         return categories
-    }
-
-    // อ่านค่า String หมวดหมู่ที่กำลังเลือกอยู่
-    private var selectedCategory: String {
-        guard let index = selectedCategoryIndex, availableCategories.indices.contains(index) else {
-            return "ทั้งหมด"
-        }
-        return availableCategories[index]
     }
 
     // รายการ Patch ที่จะนำไปแสดงใน UI list ตาม Category ที่เลือกอยู่
@@ -156,6 +149,10 @@ struct QuickApplyView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if !isLoadingCatalog && availableCategories.count > 1 {
+                categoryFilterBar
+            }
+
             List {
                 if !isLoadingCatalog {
                     patchCatalogSection
@@ -165,12 +162,6 @@ struct QuickApplyView: View {
             
             if !filteredGamePatches.isEmpty && !isLoadingCatalog {
                 bottomActionButtons
-            }
-        }
-        // ติดตั้ง Filter ไว้ภายนอก VStack หลักผ่าน safeAreaInset เพื่อให้ลอยอยู่บนสุดแบบนุ่มนวล
-        .safeAreaInset(edge: .top) {
-            if !isLoadingCatalog && availableCategories.count > 1 {
-                categoryFilterBar
             }
         }
         .navigationTitle(selectedApp.name)
@@ -197,26 +188,29 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Category Filter Bar (ปรับแต่งตามโจทย์: ไว้นอก VStack, ขยับลงมา และลบ Divider)
+    // MARK: - Category Filter Bar (Fixed Identity)
 
     private var categoryFilterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(Array(availableCategories.enumerated()), id: \.offset) { index, category in
-                    TabButton(
-                        title: category,
-                        isSelected: selectedCategoryIndex == index,
-                        count: countForCategory(category)
-                    ) {
-                        selectedCategoryIndex = index
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(availableCategories, id: \.self) { category in
+                        TabButton(
+                            title: category,
+                            isSelected: selectedCategory == category,
+                            count: countForCategory(category)
+                        ) {
+                            selectedCategory = category
+                        }
                     }
                 }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            .background(Color(.systemBackground))
+
+            Divider()
         }
-        .background(Color(.systemBackground))
-        .padding(.top, 8) // เพิ่มขยับลงมาจากขอบบน/NavigationBar
     }
 
     // MARK: - Patch Catalog Section
