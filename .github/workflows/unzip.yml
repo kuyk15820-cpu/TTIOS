@@ -151,13 +151,15 @@ jobs:
           project.save
           EOF
 
-      # 🟢 6. ดาวน์โหลดและติดตั้ง SwiftShield จาก GitHub Release โดยตรง (หลีกเลี่ยงข้อผิดพลาด Homebrew)
+      # 🟢 6. แตกไฟล์ลงโฟลเดอร์ชั่วคราว (-o ทับไฟล์เดิมอัตโนมัติ) และติดตั้งลง /usr/local/bin
       - name: install and run swiftshield
         run: |
           curl -L https://github.com/rockbruno/swiftshield/releases/latest/download/swiftshield.zip -o swiftshield.zip
-          unzip -q swiftshield.zip
-          chmod +x swiftshield
-          sudo mv swiftshield /usr/local/bin/
+          unzip -o swiftshield.zip -d swiftshield_tmp
+          sudo mkdir -p /usr/local/bin
+          sudo chmod +x swiftshield_tmp/swiftshield
+          sudo mv swiftshield_tmp/swiftshield /usr/local/bin/
+          rm -rf swiftshield.zip swiftshield_tmp
           swiftshield -v
 
       - name: build
