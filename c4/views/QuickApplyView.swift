@@ -9,6 +9,7 @@ struct NativeListRowButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .opacity(configuration.isPressed ? 0.55 : 1.0)
     }
 }
 
@@ -119,6 +120,7 @@ struct QuickApplyView: View {
     @State private var activePatches: [String: Bool] = [:]
     @State private var selectedItems: Set<String> = []
     @State private var selectedCategory: String = "ทั้งหมด"
+    @State private var isMultiSelectMode = false
 
     @State private var isLoadingCatalog = false
     @State private var processingItemID: String?
@@ -219,17 +221,16 @@ struct QuickApplyView: View {
                             Button {
                                 toggleSelectAll()
                             } label: {
-                                let allSelected = isAllSmartSelected()
                                 HStack(spacing: 4) {
-                                    Image(systemName: allSelected ? "checkmark.circle" : "circle")
+                                    Image(systemName: isMultiSelectMode ? "checkmark.circle" : "circle")
                                         .font(.caption)
                                     Text("เลือกหลายรายการ")
                                         .font(.caption.bold())
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(allSelected ? AppTheme.accent.opacity(0.15) : Color.secondary.opacity(0.12))
-                                .foregroundColor(allSelected ? AppTheme.accent : .primary)
+                                .background(isMultiSelectMode ? AppTheme.accent.opacity(0.15) : Color.secondary.opacity(0.12))
+                                .foregroundColor(isMultiSelectMode ? AppTheme.accent : .primary)
                                 .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
@@ -310,18 +311,19 @@ struct QuickApplyView: View {
                 return
             }
 
-            if !selectedItems.isEmpty {
+            if isMultiSelectMode {
                 toggleSelection(for: item)
             } else {
                 handleToggleChange(item: item, enable: !isApplied)
             }
         } label: {
             HStack(alignment: .center, spacing: 10) {
-                // ไอคอนเลือกหลายรายการ (แสดงฝั่งซ้ายเมื่อมีการกดเลือกหลายรายการเท่านั้น)
-                if !selectedItems.isEmpty {
+                // ไอคอนเลือกหลายรายการ (สไลด์ออกมาจากซ้ายเมื่อเปิดโหมดเลือกหลายรายการ)
+                if isMultiSelectMode {
                     Image(systemName: isSelected ? "checkmark.circle" : "circle")
                         .font(.title3)
                         .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
+                        .transition(.move(edge: .leading).combined(with: .opacity))
                         .onTapGesture {
                             guard !isDisabled && isServerActive else { return }
                             toggleSelection(for: item)
@@ -352,8 +354,11 @@ struct QuickApplyView: View {
 
                 Spacer(minLength: 4)
 
-                // ป้ายบอกสถานะปิดปรับปรุง หรือ ปุ่ม "คืนค่าเดิม" หากมีการเปิดใช้อยู่
-                if !isServerActive {
+                // แสดง Spinner หรือข้อความสถานะด้านขวา (ไม่ทับซ้อนกัน)
+                if processingItemID == item.id {
+                    ActivityIndicator(isAnimating: true, style: .medium)
+                        .transition(.opacity)
+                } else if !isServerActive {
                     if isApplied {
                         Text("คืนค่าเดิม")
                             .font(.subheadline.bold())
@@ -371,10 +376,7 @@ struct QuickApplyView: View {
                             )
                             .clipShape(Capsule())
                     }
-                }
-
-                // ข้อความบอกสถานะ "ใช้งานอยู่" ฝั่งขวา (เฉพาะกรณี Server ปกติ)
-                if isApplied && isServerActive {
+                } else if isApplied {
                     Text("ใช้งานอยู่")
                         .font(.subheadline.bold())
                         .foregroundStyle(.green)
@@ -385,6 +387,7 @@ struct QuickApplyView: View {
             .padding(.vertical, 10)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
+            .animation(.easeInOut(duration: 0.25), value: isMultiSelectMode)
         }
         .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
         .disabled(isDisabled || (!isServerActive && !isApplied))
@@ -502,21 +505,11 @@ struct QuickApplyView: View {
     }
 
     private func toggleSelectAll() {
-        if isAllSmartSelected() {
-            selectedItems.removeAll()
-        } else {
-            var newSelection = Set<String>()
-            
-            if let firstAim = availableItems.first(where: { $0.isAimCategory }) {
-                newSelection.insert(firstAim.id)
+        withAnimation(.easeInOut(duration: 0.25)) {
+            isMultiSelectMode.toggle()
+            if !isMultiSelectMode {
+                selectedItems.removeAll()
             }
-            
-            let nonAimItems = availableItems.filter { !$0.isAimCategory }
-            for item in nonAimItems {
-                newSelection.insert(item.id)
-            }
-            
-            selectedItems = newSelection
         }
     }
 
@@ -811,6 +804,7 @@ struct QuickApplyView: View {
             await MainActor.run {
                 self.isProcessingBatch = false
                 self.selectedItems.removeAll()
+                self.isMultiSelectMode = false
                 if finalSuccessCount > 0 {
                     self.showSuccessNotification(message: "ติดตั้ง Patch (\(finalSuccessCount) รายการ) เรียบร้อยแล้ว")
                 } else {
@@ -850,6 +844,7 @@ struct QuickApplyView: View {
             await MainActor.run {
                 self.isRestoringAll = false
                 self.selectedItems.removeAll()
+                self.isMultiSelectMode = false
                 if finalCount > 0 {
                     self.showSuccessNotification(message: "คืนค่า Patch ต้นฉบับเรียบร้อยแล้ว")
                 } else {
