@@ -108,12 +108,13 @@ jobs:
           end
 
           # 🟢 4. สั่งเพิ่ม Swift Package (swiftui-particles -> Product Name: Particles)
+          # 💡 เปลี่ยนเป็นดึงจาก branch main เนื่องจากยังไม่มี Release Version 2.0.0
           particles_url = 'https://github.com/benlmyers/swiftui-particles.git'
           particles_ref = project.root_object.package_references.find { |p| p.repositoryURL == particles_url }
           unless particles_ref
             particles_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
             particles_ref.repositoryURL = particles_url
-            particles_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '2.0.0' }
+            particles_ref.requirement = { 'kind' => 'branch', 'branch' => 'main' }
             project.root_object.package_references << particles_ref
             
             particles_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
