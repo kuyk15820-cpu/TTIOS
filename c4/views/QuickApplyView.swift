@@ -26,6 +26,39 @@ extension String {
     }
 }
 
+// MARK: - Dissolve Effect View Component
+
+struct DissolvingText: View {
+    let text: String
+    let isApplied: Bool
+
+    var body: some View {
+        ZStack {
+            if isApplied {
+                Text(text)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.green)
+                    .transition(.identity)
+            } else {
+                ParticleSystem {
+                    Lattice {
+                        Text(text)
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.green)
+                    }
+                    .lifetime(0.6)
+                    .initialVelocity(xIn: -1.5 ... 1.5, yIn: -2.0 ... -0.2)
+                    .initialAcceleration(y: 0.8)
+                    .scale(by: 0.8)
+                    .opacity(0.0)
+                }
+                .frame(width: 70, height: 24)
+            }
+        }
+        .animation(.none, value: isApplied)
+    }
+}
+
 // MARK: - Models
 
 struct QuickPatchItem: Identifiable, Codable {
@@ -377,12 +410,8 @@ struct QuickApplyView: View {
                             )
                             .clipShape(Capsule())
                     }
-                } else if isApplied {
-                    Text("ใช้งานอยู่")
-                        .font(.subheadline.bold())
-                        .foregroundStyle(.green)
-                        .transition(.scale.combined(with: .opacity))
-                        .dissolve(if: !isApplied)
+                } else {
+                    DissolvingText(text: "ใช้งานอยู่", isApplied: isApplied)
                 }
             }
             .padding(.horizontal, 16)
