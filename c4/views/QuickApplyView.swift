@@ -94,7 +94,7 @@ struct CategoryTabButton: View {
     }
 }
 
-// MARK: - QuickApplyView (โครงสร้าง List เดิม + Fix Touch Hit-Box)
+// MARK: - QuickApplyView (โครงสร้าง List + แก้ไข Error & Touch Hit-Box)
 
 struct QuickApplyView: View {
     let selectedApp: TargetGameApp
@@ -223,7 +223,6 @@ struct QuickApplyView: View {
                     }
                 }
                 .listStyle(.plain)
-                .environment(\.defaultMinRowHeight, 44)
                 .onAppear {
                     // Fix iOS Inset Bug สำหรับ UITableView
                     UIScrollView.appearance().contentInsetAdjustmentBehavior = .never
@@ -354,6 +353,7 @@ struct QuickApplyView: View {
             }
         }
         .padding(.vertical, 4)
+        .frame(minHeight: 44)
         .contentShape(Rectangle())
     }
 
