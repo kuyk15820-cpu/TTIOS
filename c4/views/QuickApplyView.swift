@@ -33,7 +33,7 @@ struct QuickPatchItem: Identifiable, Codable {
     }
 }
 
-// MARK: - Filter Bar Component (ถอดแบบจากไฟล์ตัวอย่าง 100%)
+// MARK: - Filter Bar Component (โครงสร้างตามไฟล์ตัวอย่าง)
 
 struct CategoryTabBar: View {
     let categories: [String]
@@ -94,7 +94,7 @@ struct CategoryTabButton: View {
     }
 }
 
-// MARK: - QuickApplyView (โครงสร้างหลักสไตล์ไฟล์ตัวอย่าง)
+// MARK: - QuickApplyView (โครงสร้าง ScrollView + LazyVStack แก้ไข Bug Hit-Box เหลื่อม)
 
 struct QuickApplyView: View {
     let selectedApp: TargetGameApp
@@ -167,7 +167,7 @@ struct QuickApplyView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // เรียกใช้ Component แยกสไตล์ไฟล์ตัวอย่าง
+            // Category Tab Bar
             if !isLoadingCatalog && availableCategories.count > 1 {
                 CategoryTabBar(
                     categories: availableCategories,
@@ -176,7 +176,7 @@ struct QuickApplyView: View {
                 )
             }
 
-            // สลับ View ชัดเจนตามข้อมูลแบบ SymbolsView
+            // Main Content Area (เปลี่ยนมาใช้ ScrollView + LazyVStack ถอดแบบไฟล์ตัวอย่าง)
             if isLoadingCatalog {
                 VStack {
                     Spacer()
@@ -194,8 +194,9 @@ struct QuickApplyView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List {
-                    Section {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        // Header Control Row
                         HStack {
                             Text("รายการ Patch ที่พร้อมใช้งาน (\(activeDisplayedPatchesCount))")
                                 .font(.caption)
@@ -214,15 +215,22 @@ struct QuickApplyView: View {
                             .buttonStyle(.plain)
                             .frame(width: 28, height: 28, alignment: .center)
                         }
-                    }
+                        .padding(.horizontal)
+                        .padding(.top, 12)
 
-                    ForEach(displayedPatches) { item in
-                        patchRow(for: item)
+                        // Items List (LazyVStack แบบเดียวกับ RecentFilesStore ในไฟล์ตัวอย่าง)
+                        LazyVStack(spacing: 8) {
+                            ForEach(displayedPatches) { item in
+                                patchRow(for: item)
+                                    .padding(.horizontal)
+                            }
+                        }
                     }
+                    .padding(.bottom, 16)
                 }
-                .listStyle(.plain)
             }
             
+            // Bottom Controls
             if !filteredGamePatches.isEmpty && !isLoadingCatalog {
                 bottomActionButtons
             }
@@ -251,7 +259,7 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Patch Row Component
+    // MARK: - Patch Row Component (ใช้ Card Style ป้องกัน Touch Collision)
 
     @ViewBuilder
     private func patchRow(for item: QuickPatchItem) -> some View {
@@ -346,7 +354,9 @@ struct QuickApplyView: View {
                 .opacity(1.0)
             }
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Bottom Action Buttons
@@ -429,6 +439,7 @@ struct QuickApplyView: View {
         .animation(.easeInOut(duration: 0.25), value: selectedItems.isEmpty)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .background(Color(.systemBackground))
     }
 
     // MARK: - Logic Handlers
