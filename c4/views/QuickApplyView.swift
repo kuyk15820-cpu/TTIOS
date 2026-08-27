@@ -26,32 +26,64 @@ extension String {
     }
 }
 
+// MARK: - View Snapshot Helper
+
+extension View {
+    @MainActor
+    func snapshot() -> UIImage {
+        let controller = UIHostingController(rootView: self.edgesIgnoringSafeArea(.all))
+        let view = controller.view
+        let targetSize = controller.sizeThatFits(in: CGSize(width: 120, height: 40))
+        view?.bounds = CGRect(origin: .zero, size: targetSize)
+        view?.backgroundColor = .clear
+
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        return renderer.image { _ in
+            view?.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
+        }
+    }
+}
+
 // MARK: - Dissolve Effect View Component
 
 struct DissolvingText: View {
     let text: String
     let isApplied: Bool
 
+    @State private var snapshotImage: UIImage?
     @State private var isDissolving = false
+    @State private var showView = true
 
     var body: some View {
         ZStack {
-            if isApplied || isDissolving {
+            if isApplied {
                 Text(text)
                     .font(.subheadline.bold())
                     .foregroundStyle(.green)
-                    .dissolve(if: isDissolving)
+            } else if isDissolving, let image = snapshotImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 70, height: 24)
+                    .dissolve(if: true)
             }
         }
-        .onChange(of: isApplied) { newValue in
-            if !newValue {
-                // Trigger dissolve effect when unapplied
-                isDissolving = true
+        .frame(width: 70, height: 24)
+        .onChange(of: isApplied) { oldValue, newValue in
+            if oldValue == true && newValue == false {
+                // สร้าง Snapshot ข้อความก่อนจะสลายตัว
+                let labelView = Text(text)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.green)
+                    .padding(4)
+                
+                self.snapshotImage = labelView.snapshot()
+                self.isDissolving = true
+                
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                    isDissolving = false
+                    self.isDissolving = false
+                    self.snapshotImage = nil
                 }
-            } else {
-                isDissolving = false
             }
         }
     }
