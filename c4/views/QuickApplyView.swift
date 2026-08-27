@@ -33,7 +33,7 @@ struct QuickPatchItem: Identifiable, Codable {
     }
 }
 
-// MARK: - Filter Bar Component (โครงสร้างตามไฟล์ตัวอย่าง)
+// MARK: - Filter Bar Component
 
 struct CategoryTabBar: View {
     let categories: [String]
@@ -94,7 +94,7 @@ struct CategoryTabButton: View {
     }
 }
 
-// MARK: - QuickApplyView (โครงสร้าง ScrollView + LazyVStack แก้ไข Bug Hit-Box เหลื่อม)
+// MARK: - QuickApplyView (โครงสร้าง List เดิม + Fix Touch Hit-Box)
 
 struct QuickApplyView: View {
     let selectedApp: TargetGameApp
@@ -176,7 +176,7 @@ struct QuickApplyView: View {
                 )
             }
 
-            // Main Content Area (เปลี่ยนมาใช้ ScrollView + LazyVStack ถอดแบบไฟล์ตัวอย่าง)
+            // Main UI Component: List สไตล์เดิม
             if isLoadingCatalog {
                 VStack {
                     Spacer()
@@ -194,9 +194,13 @@ struct QuickApplyView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        // Header Control Row
+                List {
+                    Section {
+                        ForEach(displayedPatches) { item in
+                            patchRow(for: item)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        }
+                    } header: {
                         HStack {
                             Text("รายการ Patch ที่พร้อมใช้งาน (\(activeDisplayedPatchesCount))")
                                 .font(.caption)
@@ -215,18 +219,17 @@ struct QuickApplyView: View {
                             .buttonStyle(.plain)
                             .frame(width: 28, height: 28, alignment: .center)
                         }
-                        .padding(.horizontal)
-                        .padding(.top, 12)
-
-                        // Items List (LazyVStack แบบเดียวกับ RecentFilesStore ในไฟล์ตัวอย่าง)
-                        LazyVStack(spacing: 8) {
-                            ForEach(displayedPatches) { item in
-                                patchRow(for: item)
-                                    .padding(.horizontal)
-                            }
-                        }
+                        .textCase(nil)
                     }
-                    .padding(.bottom, 16)
+                }
+                .listStyle(.plain)
+                .environment(\.defaultMinRowHeight, 44)
+                .onAppear {
+                    // Fix iOS Inset Bug สำหรับ UITableView
+                    UIScrollView.appearance().contentInsetAdjustmentBehavior = .never
+                }
+                .onDisappear {
+                    UIScrollView.appearance().contentInsetAdjustmentBehavior = .automatic
                 }
             }
             
@@ -259,7 +262,7 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Patch Row Component (ใช้ Card Style ป้องกัน Touch Collision)
+    // MARK: - Patch Row Component (รองรับการกดใน List)
 
     @ViewBuilder
     private func patchRow(for item: QuickPatchItem) -> some View {
@@ -268,7 +271,32 @@ struct QuickApplyView: View {
         let isServerActive = item.active ?? true
 
         HStack(alignment: .center, spacing: 8) {
-            Button {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(item.title)
+                        .font(.headline)
+                        .foregroundStyle(Color.primary)
+                    
+                    if let category = item.category {
+                        Text("[\(category)]")
+                            .font(.caption.bold())
+                            .foregroundStyle(item.isAimCategory ? .orange : .blue)
+                    }
+                }
+
+                if let updatedAt = item.updatedAt, !updatedAt.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption2)
+                        Text("อัปเดตเมื่อ: \(updatedAt.toRelativeTimeText)")
+                            .font(.subheadline)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture {
                 if isServerActive && processingItemID == nil && !isRestoringAll && !isProcessingBatch {
                     if selectedItems.isEmpty {
                         handleToggleChange(item: item, enable: !isApplied)
@@ -276,35 +304,7 @@ struct QuickApplyView: View {
                         toggleSelection(for: item)
                     }
                 }
-            } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(item.title)
-                            .font(.headline)
-                            .foregroundStyle(Color.primary)
-                        
-                        if let category = item.category {
-                            Text("[\(category)]")
-                                .font(.caption.bold())
-                                .foregroundStyle(item.isAimCategory ? .orange : .blue)
-                        }
-                    }
-
-                    if let updatedAt = item.updatedAt, !updatedAt.isEmpty {
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .font(.caption2)
-                            Text("อัปเดตเมื่อ: \(updatedAt.toRelativeTimeText)")
-                                .font(.subheadline)
-                        }
-                        .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .disabled(!isServerActive || processingItemID != nil || isRestoringAll || isProcessingBatch)
             .opacity(isServerActive ? 1.0 : 0.75)
 
             Spacer(minLength: 4)
@@ -321,7 +321,6 @@ struct QuickApplyView: View {
                             .strokeBorder(Color.red, lineWidth: 1.0)
                     )
                     .clipShape(Capsule())
-                    .opacity(1.0)
             }
 
             if isServerActive || isApplied {
@@ -348,15 +347,14 @@ struct QuickApplyView: View {
                         }
                     }
                     .frame(width: 28, height: 28, alignment: .center)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled((!isServerActive && !isApplied) || processingItemID != nil || isRestoringAll || isProcessingBatch)
-                .opacity(1.0)
             }
         }
-        .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Bottom Action Buttons
