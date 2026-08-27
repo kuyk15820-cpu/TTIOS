@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import Particles
 
 // MARK: - Native List Row Button Style ( Highlighting Effect )
 
@@ -23,68 +22,6 @@ extension String {
         }
         let safeDate = min(date, Date())
         return safeDate.formatted(.relative(presentation: .named).locale(Locale(identifier: "th_TH")))
-    }
-}
-
-// MARK: - View Snapshot Helper
-
-extension View {
-    @MainActor
-    func snapshot() -> UIImage {
-        let controller = UIHostingController(rootView: self.edgesIgnoringSafeArea(.all))
-        let view = controller.view
-        let targetSize = controller.sizeThatFits(in: CGSize(width: 120, height: 40))
-        view?.bounds = CGRect(origin: .zero, size: targetSize)
-        view?.backgroundColor = .clear
-
-        let renderer = UIGraphicsImageRenderer(size: targetSize)
-        return renderer.image { _ in
-            view?.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
-        }
-    }
-}
-
-// MARK: - Dissolve Effect View Component
-
-struct DissolvingText: View {
-    let text: String
-    let isApplied: Bool
-
-    @State private var snapshotImage: UIImage?
-    @State private var isDissolving = false
-
-    var body: some View {
-        ZStack {
-            if isApplied {
-                Text(text)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.green)
-            } else if isDissolving, let image = snapshotImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 70, height: 24)
-                    .dissolve(if: true)
-            }
-        }
-        .frame(width: 70, height: 24)
-        .onChange(of: isApplied) { newValue in
-            // เมื่อสลับจาก true -> false ให้เริ่มทำ Dissolve Effect
-            if !newValue {
-                let labelView = Text(text)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.green)
-                    .padding(4)
-                
-                self.snapshotImage = labelView.snapshot()
-                self.isDissolving = true
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                    self.isDissolving = false
-                    self.snapshotImage = nil
-                }
-            }
-        }
     }
 }
 
@@ -439,8 +376,11 @@ struct QuickApplyView: View {
                             )
                             .clipShape(Capsule())
                     }
-                } else {
-                    DissolvingText(text: "ใช้งานอยู่", isApplied: isApplied)
+                } else if isApplied {
+                    Text("ใช้งานอยู่")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.green)
+                        .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 16)
