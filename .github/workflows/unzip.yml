@@ -113,7 +113,7 @@ jobs:
           unless particles_ref
             particles_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
             particles_ref.repositoryURL = particles_url
-            particles_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.0.0' }
+            particles_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '2.0.0' }
             project.root_object.package_references << particles_ref
             
             particles_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
