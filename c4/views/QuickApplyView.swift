@@ -52,7 +52,6 @@ struct DissolvingText: View {
 
     @State private var snapshotImage: UIImage?
     @State private var isDissolving = false
-    @State private var showView = true
 
     var body: some View {
         ZStack {
@@ -69,9 +68,9 @@ struct DissolvingText: View {
             }
         }
         .frame(width: 70, height: 24)
-        .onChange(of: isApplied) { oldValue, newValue in
-            if oldValue == true && newValue == false {
-                // สร้าง Snapshot ข้อความก่อนจะสลายตัว
+        .onChange(of: isApplied) { newValue in
+            // เมื่อสลับจาก true -> false ให้เริ่มทำ Dissolve Effect
+            if !newValue {
                 let labelView = Text(text)
                     .font(.subheadline.bold())
                     .foregroundStyle(.green)
