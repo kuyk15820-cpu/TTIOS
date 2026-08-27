@@ -9,15 +9,6 @@ struct NativeListRowButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(
-                isSelected
-                    ? AppTheme.accent.opacity(0.15)
-                    : (configuration.isPressed && !isDisabled
-                        ? Color(.systemFill)
-                        : Color(.systemBackground))
-            )
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-            .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }
 
@@ -270,6 +261,17 @@ struct QuickApplyView: View {
         .tint(AppTheme.accent)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Task {
+                        await fetchCatalog(force: true)
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(isLoadingCatalog || processingItemID != nil || isRestoringAll || isProcessingBatch)
+                .accessibilityLabel("รีเฟรชข้อมูล")
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button { showLogs = true } label: {
                     Image(systemName: "apple.terminal")
                 }
@@ -315,14 +317,16 @@ struct QuickApplyView: View {
             }
         } label: {
             HStack(alignment: .center, spacing: 10) {
-                // ไอคอนเลือกหลายรายการ (แสดงฝั่งซ้ายเมื่อถูกเลือก)
-                Image(systemName: isSelected ? "checkmark.circle" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
-                    .onTapGesture {
-                        guard !isDisabled && isServerActive else { return }
-                        toggleSelection(for: item)
-                    }
+                // ไอคอนเลือกหลายรายการ (แสดงฝั่งซ้ายเมื่อมีการกดเลือกหลายรายการเท่านั้น)
+                if !selectedItems.isEmpty {
+                    Image(systemName: isSelected ? "checkmark.circle" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
+                        .onTapGesture {
+                            guard !isDisabled && isServerActive else { return }
+                            toggleSelection(for: item)
+                        }
+                }
 
                 // เนื้อหาหลักของ Row (ส่วนที่ถูกทำให้จางเมื่อปิดปรับปรุง)
                 VStack(alignment: .leading, spacing: 4) {
@@ -330,12 +334,6 @@ struct QuickApplyView: View {
                         Text(item.title)
                             .font(.headline)
                             .foregroundStyle(Color.primary)
-                        
-                        if let category = item.category {
-                            Text("[\(category)]")
-                                .font(.caption.bold())
-                                .foregroundStyle(item.isAimCategory ? .orange : .blue)
-                        }
                     }
 
                     if let updatedAt = item.updatedAt, !updatedAt.isEmpty {
@@ -354,23 +352,29 @@ struct QuickApplyView: View {
 
                 Spacer(minLength: 4)
 
-                // ป้ายบอกสถานะปิดปรับปรุง (คงความสว่าง สีแดงสด อ่านง่าย)
+                // ป้ายบอกสถานะปิดปรับปรุง หรือ ปุ่ม "คืนค่าเดิม" หากมีการเปิดใช้อยู่
                 if !isServerActive {
-                    Text("ปิดปรับปรุง")
-                        .font(.caption2.bold())
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .foregroundStyle(.red)
-                        .background(Color.clear)
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(Color.red, lineWidth: 1.0)
-                        )
-                        .clipShape(Capsule())
+                    if isApplied {
+                        Text("คืนค่าเดิม")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.red)
+                    } else {
+                        Text("ปิดปรับปรุง")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .foregroundStyle(.red)
+                            .background(Color.clear)
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(Color.red, lineWidth: 1.0)
+                            )
+                            .clipShape(Capsule())
+                    }
                 }
 
-                // ข้อความบอกสถานะ "ใช้งานอยู่" ฝั่งขวา
-                if isApplied {
+                // ข้อความบอกสถานะ "ใช้งานอยู่" ฝั่งขวา (เฉพาะกรณี Server ปกติ)
+                if isApplied && isServerActive {
                     Text("ใช้งานอยู่")
                         .font(.subheadline.bold())
                         .foregroundStyle(.green)
