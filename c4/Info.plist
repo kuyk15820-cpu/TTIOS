@@ -78,7 +78,7 @@
 		<key>UILaunchScreen</key>
 	<dict>
 		<key>UIImageName</key>
-		<string>LaunchLogo</string>
+		<string>AppIcon-1024</string>
 		<key>UIImageRespectsSafeAreaInsets</key>
 		<true/>
 	</dict>
