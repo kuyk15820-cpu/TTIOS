@@ -1,19 +1,23 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Native List Row Button Style ( Highlight Effect ตอนกด )
+// MARK: - Native List Row Button Style ( Highlighting Effect )
 
 struct NativeListRowButtonStyle: ButtonStyle {
     let isDisabled: Bool
+    let isSelected: Bool
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(
-                configuration.isPressed && !isDisabled
-                    ? Color(.systemFill)
-                    : Color(.systemBackground)
+                isSelected
+                    ? AppTheme.accent.opacity(0.15)
+                    : (configuration.isPressed && !isDisabled
+                        ? Color(.systemFill)
+                        : Color(.systemBackground))
             )
-            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }
 
@@ -110,7 +114,7 @@ struct CategoryTabButton: View {
     }
 }
 
-// MARK: - QuickApplyView (UI Native List + ScrollView Engine)
+// MARK: - QuickApplyView
 
 struct QuickApplyView: View {
     let selectedApp: TargetGameApp
@@ -124,9 +128,6 @@ struct QuickApplyView: View {
     @State private var activePatches: [String: Bool] = [:]
     @State private var selectedItems: Set<String> = []
     @State private var selectedCategory: String = "ทั้งหมด"
-    
-    // โหมดแก้ไข (Multi-selection Mode)
-    @State private var isEditing = false
 
     @State private var isLoadingCatalog = false
     @State private var processingItemID: String?
@@ -223,27 +224,24 @@ struct QuickApplyView: View {
                             
                             Spacer()
                             
-                            // ปุ่มเลือกหลายรายการทรงแคปซูล แสดงเมื่อกด "แก้ไข"
-                            if isEditing {
-                                Button {
-                                    toggleSelectAll()
-                                } label: {
-                                    let allSelected = isAllSmartSelected()
-                                    HStack(spacing: 4) {
-                                        Image(systemName: allSelected ? "checkmark.circle.fill" : "circle")
-                                            .font(.caption)
-                                        Text("เลือกหลายรายการ")
-                                            .font(.caption.bold())
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(allSelected ? AppTheme.accent.opacity(0.15) : Color.secondary.opacity(0.12))
-                                    .foregroundColor(allSelected ? AppTheme.accent : .primary)
-                                    .clipShape(Capsule())
+                            // ปุ่มเลือกหลายรายการ
+                            Button {
+                                toggleSelectAll()
+                            } label: {
+                                let allSelected = isAllSmartSelected()
+                                HStack(spacing: 4) {
+                                    Image(systemName: allSelected ? "checkmark.circle" : "circle")
+                                        .font(.caption)
+                                    Text("เลือกหลายรายการ")
+                                        .font(.caption.bold())
                                 }
-                                .buttonStyle(.plain)
-                                .transition(.scale.combined(with: .opacity))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(allSelected ? AppTheme.accent.opacity(0.15) : Color.secondary.opacity(0.12))
+                                .foregroundColor(allSelected ? AppTheme.accent : .primary)
+                                .clipShape(Capsule())
                             }
+                            .buttonStyle(.plain)
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
@@ -252,11 +250,10 @@ struct QuickApplyView: View {
 
                         Divider()
 
-                        // Patch List Rows (สร้าง UI ถอดแบบ Plain List 100%)
+                        // Patch List Rows
                         ForEach(displayedPatches) { item in
                             patchRow(for: item)
-                            Divider()
-                                .padding(.leading, 16) // ย่อ Divider ตามมาตรฐาน iOS List
+                            Divider() // เส้นแบ่งยาวเต็มหน้าจอ
                         }
                     }
                 }
@@ -272,19 +269,6 @@ struct QuickApplyView: View {
         .navigationBarTitleDisplayMode(.large)
         .tint(AppTheme.accent)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        isEditing.toggle()
-                        if !isEditing {
-                            selectedItems.removeAll()
-                        }
-                    }
-                } label: {
-                    Text(isEditing ? "เสร็จสิ้น" : "แก้ไข")
-                        .font(.body.weight(isEditing ? .bold : .regular))
-                }
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { showLogs = true } label: {
                     Image(systemName: "apple.terminal")
@@ -305,7 +289,7 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Patch Row Component ( Highlight ทึบเมื่อคลิก + ทึบพิเศษเมื่อปิดปรับปรุง )
+    // MARK: - Patch Row Component
 
     @ViewBuilder
     private func patchRow(for item: QuickPatchItem) -> some View {
@@ -324,22 +308,23 @@ struct QuickApplyView: View {
                 return
             }
 
-            if isEditing {
+            if !selectedItems.isEmpty {
                 toggleSelection(for: item)
             } else {
                 handleToggleChange(item: item, enable: !isApplied)
             }
         } label: {
             HStack(alignment: .center, spacing: 10) {
-                // ไอคอนเลือกหลายรายการ (แสดงฝั่งซ้ายเมื่อเปิดโหมดแก้ไข)
-                if isEditing {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.title3)
-                        .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                }
+                // ไอคอนเลือกหลายรายการ (แสดงฝั่งซ้ายเมื่อถูกเลือก)
+                Image(systemName: isSelected ? "checkmark.circle" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
+                    .onTapGesture {
+                        guard !isDisabled && isServerActive else { return }
+                        toggleSelection(for: item)
+                    }
 
-                // เนื้อหาหลักของ Row
+                // เนื้อหาหลักของ Row (ส่วนที่ถูกทำให้จางเมื่อปิดปรับปรุง)
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(item.title)
@@ -364,10 +349,12 @@ struct QuickApplyView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .opacity(isServerActive ? 1.0 : 0.35)
+                .grayscale(isServerActive ? 0.0 : 1.0)
 
                 Spacer(minLength: 4)
 
-                // ป้ายบอกสถานะปิดปรับปรุง
+                // ป้ายบอกสถานะปิดปรับปรุง (คงความสว่าง สีแดงสด อ่านง่าย)
                 if !isServerActive {
                     Text("ปิดปรับปรุง")
                         .font(.caption2.bold())
@@ -382,25 +369,20 @@ struct QuickApplyView: View {
                         .clipShape(Capsule())
                 }
 
-                // แสดงไอคอนเปิดใช้งานฝั่งขวา (เฉพาะเมื่อเปิดใช้งานเท่านั้น)
+                // ข้อความบอกสถานะ "ใช้งานอยู่" ฝั่งขวา
                 if isApplied {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.headline)
-                            .foregroundStyle(AppTheme.accent)
-                    }
-                    .transition(.scale.combined(with: .opacity))
+                    Text("ใช้งานอยู่")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.green)
+                        .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
-            // ปรับระดับความทึบลงเหลือ 0.35 + ปลดสีสันออกเมื่อปิดปรับปรุง
-            .opacity(isServerActive ? 1.0 : 0.35)
-            .grayscale(isServerActive ? 0.0 : 1.0)
         }
-        .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied)))
+        .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
         .disabled(isDisabled || (!isServerActive && !isApplied))
     }
 
@@ -825,7 +807,6 @@ struct QuickApplyView: View {
             await MainActor.run {
                 self.isProcessingBatch = false
                 self.selectedItems.removeAll()
-                self.isEditing = false
                 if finalSuccessCount > 0 {
                     self.showSuccessNotification(message: "ติดตั้ง Patch (\(finalSuccessCount) รายการ) เรียบร้อยแล้ว")
                 } else {
@@ -865,7 +846,6 @@ struct QuickApplyView: View {
             await MainActor.run {
                 self.isRestoringAll = false
                 self.selectedItems.removeAll()
-                self.isEditing = false
                 if finalCount > 0 {
                     self.showSuccessNotification(message: "คืนค่า Patch ต้นฉบับเรียบร้อยแล้ว")
                 } else {
