@@ -11,7 +11,7 @@ struct TargetGameView: View {
             List {
                 Section {
                     ForEach(targetApps) { app in
-                        NavigationLink(destination: QuickApplyView(selectedApp: app)) {
+                        NavigationLink(value: app) {
                             HStack(spacing: 12) {
                                 if let icon = app.icon {
                                     Image(uiImage: icon)
@@ -27,6 +27,7 @@ struct TargetGameView: View {
                                 Text(app.name)
                                     .font(.headline)
                             }
+                            .contentShape(Rectangle())
                         }
                     }
                 } header: {
@@ -36,6 +37,9 @@ struct TargetGameView: View {
             .listStyle(.plain)
             .navigationTitle("หน้าแรก")
             .navigationBarTitleDisplayMode(.large)
+            .navigationDestination(for: TargetGameApp.self) { app in
+                QuickApplyView(selectedApp: app)
+            }
         }
     }
 }
