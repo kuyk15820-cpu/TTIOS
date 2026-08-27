@@ -49,7 +49,7 @@ struct DissolvingText: View {
                     .lifetime(0.6)
                     .initialVelocity(xIn: -1.5 ... 1.5, yIn: -2.0 ... -0.2)
                     .initialAcceleration(y: 0.8)
-                    .scale(by: 0.8)
+                    .scale(0.8)
                     .opacity(0.0)
                 }
                 .frame(width: 70, height: 24)
