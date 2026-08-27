@@ -33,9 +33,38 @@ struct QuickPatchItem: Identifiable, Codable {
     }
 }
 
-// MARK: - Tab Button Component
+// MARK: - Filter Bar Component (ถอดแบบจากไฟล์ตัวอย่าง 100%)
 
-struct TabButton: View {
+struct CategoryTabBar: View {
+    let categories: [String]
+    @Binding var selectedCategory: String
+    let countProvider: (String) -> Int?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(categories, id: \.self) { category in
+                        CategoryTabButton(
+                            title: category,
+                            isSelected: selectedCategory == category,
+                            count: countProvider(category)
+                        ) {
+                            selectedCategory = category
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+            .background(Color(.systemBackground))
+
+            Divider()
+        }
+    }
+}
+
+struct CategoryTabButton: View {
     let title: String
     let isSelected: Bool
     var count: Int?
@@ -65,7 +94,7 @@ struct TabButton: View {
     }
 }
 
-// MARK: - QuickApplyView (แบบ SymbolsView Pattern)
+// MARK: - QuickApplyView (โครงสร้างหลักสไตล์ไฟล์ตัวอย่าง)
 
 struct QuickApplyView: View {
     let selectedApp: TargetGameApp
@@ -138,12 +167,16 @@ struct QuickApplyView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Filter Bar ด้านบน
+            // เรียกใช้ Component แยกสไตล์ไฟล์ตัวอย่าง
             if !isLoadingCatalog && availableCategories.count > 1 {
-                categoryFilterBar
+                CategoryTabBar(
+                    categories: availableCategories,
+                    selectedCategory: $selectedCategory,
+                    countProvider: { cat in countForCategory(cat) }
+                )
             }
 
-            // โครงสร้างเรนเดอร์เนื้อหาตามรูปแบบ SymbolsView
+            // สลับ View ชัดเจนตามข้อมูลแบบ SymbolsView
             if isLoadingCatalog {
                 VStack {
                     Spacer()
@@ -216,31 +249,6 @@ struct QuickApplyView: View {
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showLogs) { LogView() }
-    }
-
-    // MARK: - Category Filter Bar
-
-    private var categoryFilterBar: some View {
-        VStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(availableCategories, id: \.self) { category in
-                        TabButton(
-                            title: category,
-                            isSelected: selectedCategory == category,
-                            count: countForCategory(category)
-                        ) {
-                            selectedCategory = category
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-            }
-            .background(Color(.systemBackground))
-
-            Divider()
-        }
     }
 
     // MARK: - Patch Row Component
