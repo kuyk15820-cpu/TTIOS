@@ -100,7 +100,6 @@ jobs:
             project.root_object.package_references << ssp_ref
             
             ssp_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
-            # 💡 แก้ไขเป็น SegmentedPicker ให้ตรงกับที่ Library ประกาศไว้ใน Package.swift
             ssp_product_dependency.product_name = 'SegmentedPicker'
             ssp_product_dependency.package = ssp_ref
             
@@ -108,7 +107,24 @@ jobs:
             puts 'Added Swift Package: SegmentedPicker'
           end
 
-          # 🟢 4. Sync ไฟล์ .swift, .m และ .h เข้า Compile Sources และ Project
+          # 🟢 4. สั่งเพิ่ม Swift Package (swiftui-particles -> Product Name: Particles)
+          particles_url = 'https://github.com/benlmyers/swiftui-particles.git'
+          particles_ref = project.root_object.package_references.find { |p| p.repositoryURL == particles_url }
+          unless particles_ref
+            particles_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            particles_ref.repositoryURL = particles_url
+            particles_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.0.0' }
+            project.root_object.package_references << particles_ref
+            
+            particles_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            particles_product_dependency.product_name = 'Particles'
+            particles_product_dependency.package = particles_ref
+            
+            target.package_product_dependencies << particles_product_dependency
+            puts 'Added Swift Package: Particles'
+          end
+
+          # 🟢 5. Sync ไฟล์ .swift, .m และ .h เข้า Compile Sources และ Project
           source_phase = target.source_build_phase
           existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
 
