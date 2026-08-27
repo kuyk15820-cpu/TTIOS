@@ -4,7 +4,6 @@ import UIKit
 // MARK: - Relative Date Helpers
 
 extension String {
-    /// แปลงข้อความวันเวลา (ISO 8601) เป็นเวลาเปรียบเทียบ เช่น "เมื่อสักครู่", "5 นาทีที่แล้ว"
     var toRelativeTimeText: String {
         guard let date = try? Date(self, strategy: .iso8601) else {
             return self
@@ -19,13 +18,12 @@ extension String {
 struct QuickPatchItem: Identifiable, Codable {
     let id: String
     let title: String
-    let updatedAt: String? // เวลา ISO 8601 จาก Server
+    let updatedAt: String?
     let downloadUrl: String
     let active: Bool?
-    let category: String? // อ่านค่า category จาก Server (เช่น "Aim", "Hologram")
-    let bundleID: String? // รองรับการกรองแยกรายเกม เช่น "com.dts.freefireth"
+    let category: String?
+    let bundleID: String?
     
-    // เช็คว่าเป็นหมวดหมู่ Aim หรือไม่
     var isAimCategory: Bool {
         if let cat = category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !cat.isEmpty {
             return cat == "aim"
@@ -35,7 +33,39 @@ struct QuickPatchItem: Identifiable, Codable {
     }
 }
 
-// MARK: - QuickApplyView
+// MARK: - Tab Button Component
+
+struct TabButton: View {
+    let title: String
+    let isSelected: Bool
+    var count: Int?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(title)
+                if let count = count {
+                    Text("\(count)")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(isSelected ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+            .font(.subheadline.weight(isSelected ? .semibold : .regular))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+            .foregroundColor(isSelected ? .accentColor : .secondary)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - QuickApplyView (แบบ SymbolsView Pattern)
 
 struct QuickApplyView: View {
     let selectedApp: TargetGameApp
@@ -48,9 +78,7 @@ struct QuickApplyView: View {
     @State private var patchItems: [QuickPatchItem] = []
     @State private var activePatches: [String: Bool] = [:]
     @State private var selectedItems: Set<String> = []
-    
-    // Index ของหมวดหมู่ที่เลือก (Default เป็น Index 0: "ทั้งหมด")
-    @State private var selectedCategoryIndex: Int = 0
+    @State private var selectedCategory: String = "ทั้งหมด"
     
     @State private var isLoadingCatalog = false
     @State private var processingItemID: String?
@@ -59,7 +87,6 @@ struct QuickApplyView: View {
     @State private var showSettings = false
     @State private var showLogs = false
 
-    // กรอง Patch ที่ตรงกับ Bundle ID ของเกมปัจจุบันเท่านั้น
     private var filteredGamePatches: [QuickPatchItem] {
         patchItems.filter { item in
             guard let bId = item.bundleID, !bId.isEmpty else { return true }
@@ -67,7 +94,6 @@ struct QuickApplyView: View {
         }
     }
 
-    // รายการ Patch ทั้งหมดที่พร้อมสกัด หมวดหมู่
     private var availableCategories: [String] {
         var categories = ["ทั้งหมด"]
         let rawCategories = filteredGamePatches.compactMap { $0.category?.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -80,71 +106,98 @@ struct QuickApplyView: View {
         return categories
     }
 
-    // อ่านค่า String หมวดหมู่ที่กำลังเลือกอยู่
-    private var selectedCategory: String {
-        guard availableCategories.indices.contains(selectedCategoryIndex) else {
-            return "ทั้งหมด"
-        }
-        return availableCategories[selectedCategoryIndex]
-    }
-
-    // ดึง Patch แยกตามชื่อหมวดหมู่
-    private func patches(for category: String) -> [QuickPatchItem] {
-        if category == "ทั้งหมด" {
+    private var displayedPatches: [QuickPatchItem] {
+        if selectedCategory == "ทั้งหมด" {
             return filteredGamePatches
         }
         return filteredGamePatches.filter {
-            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == category.lowercased()
+            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == selectedCategory.lowercased()
         }
     }
 
-    // เช็คว่ามี Patch ไหนเปิดใช้งานอยู่หรือไม่
+    private var activeDisplayedPatchesCount: Int {
+        displayedPatches.filter { $0.active ?? true }.count
+    }
+
     private var hasActivePatches: Bool {
         activePatches.values.contains(true)
     }
 
-    // รายการที่เปิดให้ทำงานบน Server ได้ในเกมปัจจุบัน
     private var availableItems: [QuickPatchItem] {
         filteredGamePatches.filter { $0.active ?? true }
     }
 
+    private func countForCategory(_ category: String) -> Int? {
+        if category == "ทั้งหมด" {
+            return filteredGamePatches.count
+        }
+        return filteredGamePatches.filter {
+            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == category.lowercased()
+        }.count
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            if !isLoadingCatalog {
-                TabView(selection: $selectedCategoryIndex) {
-                    ForEach(Array(availableCategories.enumerated()), id: \.offset) { index, category in
-                        let categoryPatches = patches(for: category)
-                        
-                        List {
-                            patchCatalogSection(for: categoryPatches)
+            // Filter Bar ด้านบน
+            if !isLoadingCatalog && availableCategories.count > 1 {
+                categoryFilterBar
+            }
+
+            // โครงสร้างเรนเดอร์เนื้อหาตามรูปแบบ SymbolsView
+            if isLoadingCatalog {
+                VStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+            } else if displayedPatches.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "square.stack.3d.up.slash")
+                        .font(.system(size: 40))
+                        .foregroundColor(.secondary)
+                    Text("ไม่พบรายการ Patch")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    Section {
+                        HStack {
+                            Text("รายการ Patch ที่พร้อมใช้งาน (\(activeDisplayedPatchesCount))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            Button {
+                                toggleSelectAll()
+                            } label: {
+                                let allSelected = isAllSmartSelected()
+                                Image(systemName: allSelected ? "checkmark.circle" : "circle")
+                                    .font(.title2)
+                                    .foregroundStyle(allSelected ? AppTheme.accent : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: 28, height: 28, alignment: .center)
                         }
-                        .listStyle(.plain)
-                        .tag(index)
+                    }
+
+                    ForEach(displayedPatches) { item in
+                        patchRow(for: item)
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-            } else {
-                Spacer()
+                .listStyle(.plain)
             }
             
             if !filteredGamePatches.isEmpty && !isLoadingCatalog {
                 bottomActionButtons
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(selectedApp.name)
+        .navigationBarTitleDisplayMode(.large)
         .tint(AppTheme.accent)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 1) {
-                    Text(selectedApp.name)
-                        .font(.headline)
-                        .foregroundStyle(Color.primary)
-                    
-                    Text("หมวดหมู่: \(selectedCategory)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { showLogs = true } label: {
                     Image(systemName: "apple.terminal")
@@ -165,35 +218,32 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Patch Catalog Section
+    // MARK: - Category Filter Bar
 
-    @ViewBuilder
-    private func patchCatalogSection(for items: [QuickPatchItem]) -> some View {
-        let activeCount = items.filter { $0.active ?? true }.count
-        
-        Section {
-            ForEach(items) { item in
-                patchRow(for: item)
-            }
-        } header: {
-            HStack {
-                Text("รายการ Patch ที่พร้อมใช้งาน (\(activeCount))")
-                
-                Spacer()
-                
-                Button {
-                    toggleSelectAll()
-                } label: {
-                    let allSelected = isAllSmartSelected()
-                    Image(systemName: allSelected ? "checkmark.circle" : "circle")
-                        .font(.title2)
-                        .foregroundStyle(allSelected ? AppTheme.accent : .secondary)
+    private var categoryFilterBar: some View {
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(availableCategories, id: \.self) { category in
+                        TabButton(
+                            title: category,
+                            isSelected: selectedCategory == category,
+                            count: countForCategory(category)
+                        ) {
+                            selectedCategory = category
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
-                .frame(width: 28, height: 28, alignment: .center)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
             }
+            .background(Color(.systemBackground))
+
+            Divider()
         }
     }
+
+    // MARK: - Patch Row Component
 
     @ViewBuilder
     private func patchRow(for item: QuickPatchItem) -> some View {
@@ -373,7 +423,7 @@ struct QuickApplyView: View {
         .padding(.vertical, 12)
     }
 
-    // MARK: - Selection Handlers
+    // MARK: - Logic Handlers
 
     private func toggleSelection(for item: QuickPatchItem) {
         if selectedItems.contains(item.id) {
@@ -420,8 +470,6 @@ struct QuickApplyView: View {
         }
     }
 
-    // MARK: - Notification Helpers (FTNotificationIndicator)
-
     @MainActor
     private func showSuccessNotification(message: String) {
         let icon = UIImage(systemName: "checkmark.circle")?.withTintColor(.white, renderingMode: .alwaysOriginal)
@@ -443,8 +491,6 @@ struct QuickApplyView: View {
             message: message
         )
     }
-
-    // MARK: - File Management & Logic
 
     private func openGame() {
         let success = AppLauncher.launchApp(bundleID: selectedApp.bundleID)
@@ -553,8 +599,6 @@ struct QuickApplyView: View {
         }
     }
 
-    // MARK: - Error Message Translator
-
     private nonisolated func translatePatchError(_ error: PatchPackageError) -> String {
         switch error.localizationKey {
         case "patch.error.invalid_project":
@@ -588,7 +632,6 @@ struct QuickApplyView: View {
                 }
 
                 if enable {
-                    // ปลดล็อกหมวดหมู่ Aim อื่นถ้ามี และเคลียร์ Receipt เก่าออกแบบเงียบๆ
                     if item.isAimCategory {
                         let activeAimItems = await self.filteredGamePatches.filter { $0.isAimCategory && $0.id != item.id }
                         for aimItem in activeAimItems {
@@ -608,7 +651,6 @@ struct QuickApplyView: View {
                         }
                     }
 
-                    // สั่งถอนการติดตั้ง Patch เดิมของตัวเองก่อน หากมีไฟล์เก่าค้างอยู่
                     if FileManager.default.fileExists(atPath: applyURL.path),
                        let existingData = try? Data(contentsOf: applyURL),
                        let existingDecoded = try? PatchPackageCodec.decode(existingData, password: nil),
@@ -616,7 +658,6 @@ struct QuickApplyView: View {
                         try? DevicePatchService.restore(receipt: existingReceipt)
                     }
 
-                    // ดาวน์โหลดและทำการ Apply Patch ใหม่
                     try await self.downloadFile(from: item.downloadUrl, to: applyURL)
 
                     let packageData = try Data(contentsOf: applyURL)
@@ -631,15 +672,12 @@ struct QuickApplyView: View {
                     }
 
                 } else {
-                    // กรณีสั่งถอน Patch (Restore)
                     if FileManager.default.fileExists(atPath: applyURL.path) {
                         if let packageData = try? Data(contentsOf: applyURL),
                            let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil),
                            let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
-                            // พยายามย้อนคืนไฟล์ตาม Receipt
                             try? DevicePatchService.restore(receipt: receipt)
                         }
-                        // ลบไฟล์ท้องถิ่นออกเพื่อล้างสถานะ
                         try? FileManager.default.removeItem(at: applyURL)
                     }
 
