@@ -75,10 +75,10 @@
 	<key>UIFileSharingEnabled</key>
 	<true/>
 
-	<key>UILaunchScreen</key>
+		<key>UILaunchScreen</key>
 	<dict>
 		<key>UIImageName</key>
-		<string>AppIcon</string>
+		<string>LaunchLogo</string>
 		<key>UIImageRespectsSafeAreaInsets</key>
 		<true/>
 	</dict>
