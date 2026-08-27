@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Particles
 
 // MARK: - Native List Row Button Style ( Highlighting Effect )
 
@@ -381,6 +382,7 @@ struct QuickApplyView: View {
                         .font(.subheadline.bold())
                         .foregroundStyle(.green)
                         .transition(.scale.combined(with: .opacity))
+                        .dissolve(if: !isApplied)
                 }
             }
             .padding(.horizontal, 16)
