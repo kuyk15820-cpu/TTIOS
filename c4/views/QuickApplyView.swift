@@ -94,7 +94,7 @@ struct CategoryTabButton: View {
     }
 }
 
-// MARK: - QuickApplyView (โครงสร้าง List + แก้ไข Error & Touch Hit-Box)
+// MARK: - QuickApplyView (UI Native List + ScrollView Engine)
 
 struct QuickApplyView: View {
     let selectedApp: TargetGameApp
@@ -176,7 +176,7 @@ struct QuickApplyView: View {
                 )
             }
 
-            // Main UI Component: List สไตล์เดิม
+            // Main Content Area
             if isLoadingCatalog {
                 VStack {
                     Spacer()
@@ -194,13 +194,9 @@ struct QuickApplyView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List {
-                    Section {
-                        ForEach(displayedPatches) { item in
-                            patchRow(for: item)
-                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                        }
-                    } header: {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Section Header สไตล์ Native List
                         HStack {
                             Text("รายการ Patch ที่พร้อมใช้งาน (\(activeDisplayedPatchesCount))")
                                 .font(.caption)
@@ -219,17 +215,22 @@ struct QuickApplyView: View {
                             .buttonStyle(.plain)
                             .frame(width: 28, height: 28, alignment: .center)
                         }
-                        .textCase(nil)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                        .background(Color(.systemGroupedBackground))
+
+                        Divider()
+
+                        // Patch List Rows (สร้าง UI ถอดแบบ Plain List 100%)
+                        ForEach(displayedPatches) { item in
+                            patchRow(for: item)
+                            Divider()
+                                .padding(.leading, 16) // ย่อ Divider ตามมาตรฐาน iOS List
+                        }
                     }
                 }
-                .listStyle(.plain)
-                .onAppear {
-                    // Fix iOS Inset Bug สำหรับ UITableView
-                    UIScrollView.appearance().contentInsetAdjustmentBehavior = .never
-                }
-                .onDisappear {
-                    UIScrollView.appearance().contentInsetAdjustmentBehavior = .automatic
-                }
+                .background(Color(.systemBackground))
             }
             
             // Bottom Controls
@@ -261,7 +262,7 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Patch Row Component (รองรับการกดใน List)
+    // MARK: - Patch Row Component (ถอดแบบ List Row แบบเป๊ะๆ)
 
     @ViewBuilder
     private func patchRow(for item: QuickPatchItem) -> some View {
@@ -352,8 +353,10 @@ struct QuickApplyView: View {
                 .disabled((!isServerActive && !isApplied) || processingItemID != nil || isRestoringAll || isProcessingBatch)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .frame(minHeight: 44)
+        .background(Color(.systemBackground))
         .contentShape(Rectangle())
     }
 
