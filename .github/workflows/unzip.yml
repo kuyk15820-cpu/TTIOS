@@ -31,7 +31,7 @@ jobs:
       - name: install ldid & swiftsecretkeys
         run: |
           brew install ldid
-          # 🟢 ติดตั้ง SwiftSecretKeys CLI ผ่าน SwiftPM โดยตรง ป้องกันปัญหา Homebrew Tap Error
+          # ติดตั้ง SwiftSecretKeys CLI ผ่าน SwiftPM โดยตรง
           git clone https://github.com/MatheusMBispo/SwiftSecretKeys.git /tmp/SwiftSecretKeys
           cd /tmp/SwiftSecretKeys
           swift build -c release
@@ -139,7 +139,8 @@ jobs:
           unless ssk_ref
             ssk_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
             ssk_ref.repositoryURL = ssk_url
-            ssk_ref.requirement = { 'kind' => 'branch', 'branch' => 'main' }
+            # ชี้ไปที่ master branch
+            ssk_ref.requirement = { 'kind' => 'branch', 'branch' => 'master' }
             project.root_object.package_references << ssk_ref
             
             ssk_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
