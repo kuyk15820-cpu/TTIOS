@@ -1,0 +1,6 @@
+cipher: aes-gcm
+
+output: Sources/SecretKeys.swift
+
+keys:
+  catalogURL: "https://f1x3r.org/patches/catalog.json"
