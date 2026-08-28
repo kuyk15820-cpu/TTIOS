@@ -2,7 +2,7 @@ import Foundation
 import UIKit
 import SwiftUI
 
-class AppUpdateCheckerManager {
+class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น ObservableObject เพื่อให้ View สังเกตสถานะได้
     
     static let shared = AppUpdateCheckerManager()
     
@@ -11,9 +11,22 @@ class AppUpdateCheckerManager {
     private var updateHandler: UpdateCheckHandler?
     private var isUpdatePresented: Bool = false
     
+    // MARK: - Download States (สำหรับ UI)
+    @Published var isDownloading = false
+    @Published var downloadProgress: Double = 0.0
+    @Published var currentDownloadFileURL: URL?
+    
+    // MARK: - Private Configuration
+    private var downloadTask: URLSessionDownloadTask?
+    private lazy var urlSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        // ไม่ใช้ Delegate ตรงนี้เพราะเราจะสังเกตผ่าน Notification
+        return URLSession(configuration: config)
+    }()
+    
     private init() {}
     
-    // MARK: - Start Checking Version
+    // MARK: - Start Checking Version (Logic เดิม)
     func checkVersion(handler: UpdateCheckHandler? = nil) {
         if let customHandler = handler {
             self.updateHandler = customHandler
@@ -98,7 +111,163 @@ class AppUpdateCheckerManager {
         }.resume()
     }
     
-    // MARK: - Safe Alert & Present Method
+    // MARK: - File & Download Logic (ปรับปรุง)
+    
+    /// หา URL ของโฟลเดอร์ Application Support/.download/
+    private func getDownloadDirectoryURL() throws -> URL {
+        let fileManager = FileManager.default
+        let appSupportURL = try fileManager.url(for: .applicationSupportDirectory,
+                                                  in: .userDomainMask,
+                                                  appropriateFor: nil,
+                                                  create: true)
+        
+        let downloadURL = appSupportURL.appendingPathComponent(".download", isDirectory: true)
+        
+        // สร้างโฟลเดอร์ถ้ายังไม่มี
+        if !fileManager.fileExists(atPath: downloadURL.path) {
+            try fileManager.createDirectory(at: downloadURL, withIntermediateDirectories: true, attributes: nil)
+        }
+        
+        return downloadURL
+    }
+    
+    /// ลบไฟล์ที่ดาวน์โหลดมา (Clean up)
+    private func deleteDownloadedFile(at fileURL: URL) {
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: fileURL.path) {
+            do {
+                try fileManager.removeItem(at: fileURL)
+                print("✅ [File Deleted]: \(fileURL.lastPathComponent)")
+            } catch {
+                print("❌ [Delete File Error]: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    // MARK: - Download Action
+    
+    /// เริ่มดาวน์โหลดไฟล์แอปมาไว้ที่เครื่อง
+    func startDownload(from urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        
+        // อัปเดต UI State บน Main Thread
+        DispatchQueue.main.async {
+            self.isDownloading = true
+            self.downloadProgress = 0.0
+            self.currentDownloadFileURL = nil
+        }
+        
+        // ยกเลิก Task เก่า (ถ้ามี)
+        downloadTask?.cancel()
+        
+        // สร้าง Download Task
+        downloadTask = URLSession.shared.downloadTask(with: url) { [weak self] (tempURL, response, error) in
+            guard let self = self else { return }
+            
+            // ปิดสถานะกำลังโหลด (บน Main Thread เสมอ)
+            DispatchQueue.main.async { self.isDownloading = false }
+            
+            if let error = error {
+                print("❌ [Download Error]: \(error.localizedDescription)")
+                // คุณอาจจะเพิ่ม showDebugAlert เพื่อบอก user
+                return
+            }
+            
+            guard let tempURL = tempURL,
+                  let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                print("❌ [Download Response Error]: Invalid server response")
+                return
+            }
+            
+            do {
+                let fileManager = FileManager.default
+                
+                // 1. เตรียมโฟลเดอร์ปลายทาง
+                let downloadDir = try self.getDownloadDirectoryURL()
+                
+                // ดึงชื่อไฟล์จาก URL (ถ้ามี) หรือใช้ชื่อ Temporary
+                let suggestedFilename = response?.suggestedFilename ?? url.lastPathComponent
+                let finalFileURL = downloadDir.appendingPathComponent(suggestedFilename)
+                
+                // 2. ถ้ามีไฟล์เดิมอยู่ที่ปลายทางให้ลบก่อน
+                if fileManager.fileExists(atPath: finalFileURL.path) {
+                    try fileManager.removeItem(at: finalFileURL)
+                }
+                
+                // 3. ย้ายไฟล์จาก Temporary location ไปยัง Application Support
+                try fileManager.moveItem(at: tempURL, to: finalFileURL)
+                
+                print("✅ [File Ready]: ดาวน์โหลดเสร็จและย้ายไปที่ \(finalFileURL.path)")
+                
+                // 4. บันทึก URL ไฟล์ล่าสุดและเปิด UI แชร์ (บน Main Thread)
+                DispatchQueue.main.async {
+                    self.currentDownloadFileURL = finalFileURL
+                    self.presentShareSheet(for: finalFileURL)
+                }
+                
+            } catch {
+                print("❌ [File Operation Error]: \(error.localizedDescription)")
+                // คุณอาจจะเพิ่ม showDebugAlert
+            }
+        }
+        
+        // เริ่มสังเกต Progress ผ่าน Notification Center
+        NotificationCenter.default.addObserver(self, selector: #selector(downloadProgressChanged), name: Notification.Name("URLSessionDownloadProgress"), object: downloadTask)
+        
+        downloadTask?.resume()
+    }
+    
+    /// สังเกต Progress ของ Task (ต้องมี Extension ของ URLSession เพิ่มเติมเพื่อส่ง Notification)
+    @objc private func downloadProgressChanged(notification: Notification) {
+        guard let task = notification.object as? URLSessionDownloadTask,
+              task == downloadTask else { return }
+        
+        if task.countOfBytesExpectedToReceive > 0 {
+            let progress = Double(task.countOfBytesReceived) / Double(task.countOfBytesExpectedToReceive)
+            DispatchQueue.main.async {
+                self.downloadProgress = progress
+            }
+        }
+    }
+    
+    // MARK: - Present Share Sheet (NEW)
+    
+    /// เปิด UI แชร์ไฟล์เพื่อให้ User บันทึกไปติดตั้งเอง
+    private func presentShareSheet(for fileURL: URL) {
+        DispatchQueue.main.async {
+            // ป้องกันการแชร์เมื่อปิด View อัปเดตไปแล้ว
+            guard self.isUpdatePresented else {
+                self.deleteDownloadedFile(at: fileURL) // ลบทิ้งถ้า View ปิดไปแล้ว
+                return
+            }
+            
+            let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+            
+            // สำหรับ iPad
+            if let popoverController = activityVC.popoverPresentationController {
+                if let topVC = self.getTopViewController() {
+                    popoverController.sourceView = topVC.view
+                    popoverController.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 0, height: 0)
+                    popoverController.permittedArrowDirections = []
+                }
+            }
+            
+            // MARK: - ลบไฟล์เมื่อ UI แชร์ปิดตัวลง (บันทึก/ยกเลิก)
+            activityVC.completionWithItemsHandler = { [weak self] (activityType, completed, returnedItems, error) in
+                guard let self = self else { return }
+                // ไม่ว่าจะ completed หรือไม่ (คือ User บันทึก หรือ User กดยกเลิก) เราก็จะลบไฟล์ทิ้งเสมอ
+                self.deleteDownloadedFile(at: fileURL)
+                self.currentDownloadFileURL = nil
+            }
+            
+            if let topVC = self.getTopViewController() {
+                topVC.present(activityVC, animated: true, completion: nil)
+            }
+        }
+    }
+    
+    // MARK: - Safe Alert & Present Method (Logic เดิม)
     private func showDebugAlert(title: String, message: String, completion: (() -> Void)? = nil) {
         DispatchQueue.main.async {
             let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
