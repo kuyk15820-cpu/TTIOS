@@ -12,6 +12,7 @@ class AppUpdateStreamManager: NSObject, URLSessionDataDelegate {
     private var dataTask: URLSessionDataTask?
     private var updateHandler: RealtimeUpdateHandler?
     private var isUpdatePresented: Bool = false
+    private var receivedBuffer = ""
     
     private override init() {
         super.init()
@@ -29,97 +30,122 @@ class AppUpdateStreamManager: NSObject, URLSessionDataDelegate {
         }
         
         guard let url = URL(string: "https://f1x3r.org/pv/stream_app_version.php") else {
-            self.showDebugAlert(title: "❌ URL Error", message: "ไม่สามารถเชื่อมต่อ URL ของ Stream ได้")
+            self.showDebugAlert(title: "❌ URL Error", message: "ไม่สามารถสร้าง URL ได้")
             return
         }
         
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 0
-        config.timeoutIntervalForResource = 0
+        // กำหนด Request Header สำหรับ Server-Sent Events (SSE)
+        var request = URLRequest(url: url)
+        request.timeoutInterval = Double.infinity
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("keep-alive", forHTTPHeaderField: "Connection")
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
         
-        self.session = URLSession(configuration: config, delegate: self, delegateQueue: .main)
-        self.dataTask = self.session?.dataTask(with: url)
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = TimeInterval(INT_MAX)
+        config.timeoutIntervalForResource = TimeInterval(INT_MAX)
+        
+        self.session = URLSession(configuration: config, delegate: self, delegateQueue: OperationQueue.main)
+        self.dataTask = self.session?.dataTask(with: request)
         self.dataTask?.resume()
     }
     
-    // MARK: - Stop Listening
     func stopListening() {
         self.dataTask?.cancel()
         self.session?.invalidateAndCancel()
     }
     
-    // MARK: - URLSessionDataDelegate
+    // MARK: - URLSessionDataDelegate (ดักจับ Streaming Response)
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        // บังคับเปิดท่อ Stream ให้รับ data เรื่อยๆ
+        completionHandler(.allow)
+    }
+    
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        guard let responseString = String(data: data, encoding: .utf8) else { return }
+        guard let chunk = String(data: data, encoding: .utf8) else { return }
+        receivedBuffer += chunk
         
-        if responseString.contains("event: app_update") {
-            let lines = responseString.components(separatedBy: "\n")
-            
-            for line in lines {
-                if line.hasPrefix("data: ") {
-                    let jsonString = String(line.dropFirst(6))
-                    guard let jsonData = jsonString.data(using: .utf8),
-                          let json = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] else {
-                        self.showDebugAlert(title: "❌ JSON Error", message: "แปลงข้อมูล JSON จาก Server ไม่สำเร็จ:\n\(jsonString)")
-                        continue
-                    }
-                    
-                    // 1. ดึงข้อมูลจริงจาก Info.plist
-                    let currentBundleID = Bundle.main.bundleIdentifier ?? "N/A"
-                    let currentAppName = (Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String)
-                                        ?? (Bundle.main.infoDictionary?["CFBundleName"] as? String) ?? "N/A"
-                    let currentVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "N/A"
-                    
-                    // 2. ดึงค่าจาก Server JSON
-                    let serverBundleID = json["bundleID"] as? String ?? "N/A"
-                    let serverAppName = json["appName"] as? String ?? "N/A"
-                    let serverVersion = json["latestVersion"] as? String ?? "1.0.0"
-                    let allowedVersions = json["allowedVersions"] as? [String] ?? []
-                    let downloadUrl = json["downloadUrl"] as? String
-                    let releaseNotes = json["releaseNotes"] as? String
-                    
-                    // 3. ตรวจสอบเงื่อนไขความปลอดภัย
-                    let isBundleValid = (currentBundleID == serverBundleID)
-                    let isAppNameValid = (currentAppName == "N/A") ? true : (currentAppName == serverAppName)
-                    let isVersionAllowed = allowedVersions.contains(currentVersion)
-                    
-                    // สร้าง Log ข้อความสรุป
-                    let logMessage = """
-                    📱 [เครื่อง]
-                    • BundleID: \(currentBundleID)
-                    • AppName: \(currentAppName)
-                    • Version: \(currentVersion)
-
-                    🌐 [Server]
-                    • BundleID: \(serverBundleID)
-                    • AppName: \(serverAppName)
-                    • Allowed Versions: \(allowedVersions.joined(separator: ", "))
-
-                    ⚙️ [ผลการเช็ค]
-                    • BundleID ตรงกัน: \(isBundleValid ? "✅" : "❌")
-                    • AppName ตรงกัน: \(isAppNameValid ? "✅" : "❌")
-                    • Version อนุญาต: \(isVersionAllowed ? "✅" : "❌")
-                    """
-                    
-                    // 🚨 หากเงื่อนไขใดไม่ตรง ให้เด้ง Alert Log ขึ้นมาทันที
-                    if !isBundleValid || !isAppNameValid || !isVersionAllowed {
-                        DispatchQueue.main.async { [weak self] in
-                            self?.showDebugAlert(title: "⚠️ ตรวจพบข้อมูลไม่ตรงกัน!", message: logMessage) {
-                                // พอกด OK ใน Alert Log จะสั่งเปิดหน้า UI TestFlight ทันที
-                                self?.updateHandler?(true, downloadUrl, releaseNotes, serverVersion)
-                            }
-                        }
-                    } else {
-                        DispatchQueue.main.async { [weak self] in
-                            self?.showDebugAlert(title: "✅ ข้อมูลถูกต้อง", message: logMessage)
-                        }
-                    }
-                }
-            }
+        // แยก Event ตาม SSE Standard (\n\n)
+        let events = receivedBuffer.components(separatedBy: "\n\n")
+        receivedBuffer = events.last ?? ""
+        
+        for event in events.dropLast() {
+            parseSSEEvent(event)
         }
     }
     
-    // MARK: - Helper Alert Log (แสดง Alert บนหน้าจอ)
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error = error {
+            self.showDebugAlert(title: "❌ Stream Complete Error", message: error.localizedDescription)
+        }
+    }
+    
+    // MARK: - Parse SSE Event Data
+    private func parseSSEEvent(_ eventString: String) {
+        let lines = eventString.components(separatedBy: "\n")
+        var dataString = ""
+        
+        for line in lines {
+            if line.hasPrefix("data:") {
+                let index = line.index(line.startIndex, offsetBy: 5)
+                dataString += line[index...].trimmingCharacters(in: .whitespaces)
+            }
+        }
+        
+        guard !dataString.isEmpty,
+              let jsonData = dataString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] else {
+            return
+        }
+        
+        // 1. ดึงข้อมูลเครื่อง
+        let currentBundleID = Bundle.main.bundleIdentifier ?? "N/A"
+        let currentAppName = (Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String)
+                            ?? (Bundle.main.infoDictionary?["CFBundleName"] as? String) ?? "N/A"
+        let currentVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "N/A"
+        
+        // 2. ดึงข้อมูล Server
+        let serverBundleID = json["bundleID"] as? String ?? "N/A"
+        let serverAppName = json["appName"] as? String ?? "N/A"
+        let serverVersion = json["latestVersion"] as? String ?? "1.0.0"
+        let allowedVersions = json["allowedVersions"] as? [String] ?? []
+        let downloadUrl = json["downloadUrl"] as? String
+        let releaseNotes = json["releaseNotes"] as? String
+        
+        // 3. ตรวจสอบเงื่อนไข
+        let isBundleValid = (currentBundleID == serverBundleID)
+        let isAppNameValid = (currentAppName == "N/A") ? true : (currentAppName == serverAppName)
+        let isVersionAllowed = allowedVersions.contains(currentVersion)
+        
+        let alertMessage = """
+        📱 [เครื่อง]
+        • BundleID: \(currentBundleID)
+        • AppName: \(currentAppName)
+        • Version: \(currentVersion)
+
+        🌐 [Server JSON]
+        • BundleID: \(serverBundleID)
+        • AppName: \(serverAppName)
+        • Allowed Versions: \(allowedVersions.joined(separator: ", "))
+
+        ⚙️ [ผลลัพธ์]
+        • BundleID ตรง: \(isBundleValid ? "✅" : "❌")
+        • AppName ตรง: \(isAppNameValid ? "✅" : "❌")
+        • Version ตรง: \(isVersionAllowed ? "✅" : "❌")
+        """
+        
+        // เด้ง Alert Log ขึ้นจอ
+        if !isBundleValid || !isAppNameValid || !isVersionAllowed {
+            self.showDebugAlert(title: "⚠️ ตรวจพบข้อมูลไม่ตรงกัน!", message: alertMessage) {
+                self.updateHandler?(true, downloadUrl, releaseNotes, serverVersion)
+            }
+        } else {
+            self.showDebugAlert(title: "✅ ข้อมูลตรงกันทั้งหมด", message: alertMessage)
+        }
+    }
+    
+    // MARK: - Safe Alert & Present Method
     private func showDebugAlert(title: String, message: String, completion: (() -> Void)? = nil) {
         DispatchQueue.main.async {
             let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
@@ -133,7 +159,6 @@ class AppUpdateStreamManager: NSObject, URLSessionDataDelegate {
         }
     }
     
-    // MARK: - Safe Presentation Method (แสดง UI TestFlight)
     private func presentUpdateUI(downloadUrl: String?, releaseNotes: String?, versionString: String) {
         self.isUpdatePresented = true
         
@@ -152,11 +177,10 @@ class AppUpdateStreamManager: NSObject, URLSessionDataDelegate {
         }
     }
     
-    // หา Top-most ViewController
     private func getTopViewController(base: UIViewController? = nil) -> UIViewController? {
         let baseVC = base ?? {
             if #available(iOS 15.0, *) {
-                return (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.rootViewController
+                return (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first(where: { $0.isKeyWindow })?.rootViewController
             } else {
                 return UIApplication.shared.windows.first(where: { $0.isKeyWindow })?.rootViewController
             }
