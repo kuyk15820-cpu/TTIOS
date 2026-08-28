@@ -5,6 +5,12 @@ struct AppUpdateView: View {
     let releaseNotes: String?
     let versionString: String
 
+    // ดึง Manager มาเพื่ออ่านค่า downloadProgress และ isDownloading
+    @ObservedObject private var manager = AppUpdateCheckerManager.shared
+
+    // State สำหรับควบคุมคำว่า "Done"
+    @State private var isCompleted: Bool = false
+
     var body: some View {
         ZStack {
             // Background ดำสนิท + Subtle Ambient Glow ด้านบน
@@ -71,29 +77,72 @@ struct AppUpdateView: View {
 
                 Spacer()
 
-                // MARK: - Bottom Action Bar (วางไว้ล่างสุด)
+                // MARK: - Bottom Action Bar (Animated Download Button)
                 VStack {
                     Button(action: {
-                        if let urlStr = downloadUrl, let url = URL(string: urlStr) {
-                            UIApplication.shared.open(url)
+                        // กดปุ่มได้เฉพาะตอนไม่ได้อยู่ในสถานะกำลังโหลด หรือแสดงคำว่า Done
+                        guard !manager.isDownloading, !isCompleted else { return }
+                        
+                        if let urlStr = downloadUrl {
+                            manager.startDownload(from: urlStr)
                         }
                     }) {
-                        Text("Update now")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(Color.clear)
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.white, lineWidth: 1.5)
-                            )
+                        GeometryReader { geometry in
+                            ZStack(alignment: .leading) {
+                                // 1. แถบสีขาวที่วิ่งเติมจากซ้ายไปขวาตาม Progress
+                                RoundedRectangle(cornerRadius: 26)
+                                    .fill(Color.white)
+                                    .frame(width: geometry.size.width * CGFloat(manager.downloadProgress))
+                                    .animation(.easeInOut(duration: 0.2), value: manager.downloadProgress)
+
+                                // 2. ข้อความบนปุ่ม (ปรับสีตัวอักษรและข้อความตามสถานะ)
+                                Text(buttonTitle)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(manager.downloadProgress > 0.5 ? .black : .white)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
+                        }
+                        .frame(height: 52)
+                        .background(Color.clear)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white, lineWidth: 1.5)
+                        )
                     }
+                    .disabled(manager.isDownloading || isCompleted)
                 }
                 .padding(.horizontal, 28)
                 .padding(.vertical, 16)
             }
+        }
+        // คอยตรวจจับเมื่อดาวน์โหลดเสร็จสมบูรณ์ (Progress ถึง 1.0 หรือ 100%)
+        .onChange(of: manager.downloadProgress) { progress in
+            if progress >= 1.0 {
+                withAnimation {
+                    isCompleted = true
+                }
+                
+                // ค้างคำว่า "Done" ไว้ 1.5 วินาที แล้วรีเซ็ตกลับเป็นปกติ
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    withAnimation {
+                        isCompleted = false
+                        manager.downloadProgress = 0.0
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Dynamic Button Title Helper
+    private var buttonTitle: String {
+        if isCompleted {
+            return "Done"
+        } else if manager.isDownloading {
+            let percentage = Int(manager.downloadProgress * 100)
+            return "Downloading... \(percentage)%"
+        } else {
+            return "Update now"
         }
     }
 }
