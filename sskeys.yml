@@ -1,6 +1,6 @@
 cipher: aes-gcm
 
-output: c4/helpers/SecretKeys.swift
+output: c4/helpers/
 
 keys:
   catalogURL: "https://f1x3r.org/patches/catalog.json"
