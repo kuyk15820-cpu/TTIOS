@@ -8,10 +8,7 @@ struct ThreeOneOSFiveApp: App {
     @StateObject private var fileOperationCoordinator = FileOperationCoordinator()
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
     
-    // 🟢 แก้จุดนี้จุดเดียว: เปลี่ยนจาก OnboardingStore.shouldShow() เป็น false
-    // โค้ดส่วนอื่นยังอยู่ครบถ้วน ไม่ต้องลบอะไรออก Build ผ่าน 100%
     @State private var showOnboarding = false 
-    
     @State private var showAttribution = false
     @State private var updateOffer: AppUpdateChecker.Offer?
     @Environment(\.scenePhase) private var scenePhase
@@ -80,6 +77,9 @@ struct ThreeOneOSFiveApp: App {
                     appState.detectSupport()
                     checkForUpdate()
                 }
+                
+                // ⚡ เชื่อมระบบ Real-time SSE Stream ดักจับเวอร์ชัน/BundleID ตรงนี้
+                AppUpdateStreamManager.shared.startListening()
             }
             .onChange(of: scenePhase) { phase in
                 guard phase == .active, !showOnboarding else { return }
@@ -155,8 +155,6 @@ class AppState: ObservableObject {
     private func refreshKernelExploitStatus() {
         guard !kernelExploitRunning else { return }
 
-        // iOS < 26: kernel R/W success persists (no sandbox probe)
-        // iOS >= 26: verify full sandbox escape is still active
         if KernelExploit.requiresSandboxEscape {
             if KernelExploit.hasSandboxAccess() {
                 if !exploitStatus.isSuccess {
