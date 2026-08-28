@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import SwiftSecretKeys
 
 // MARK: - Native List Row Button Style ( Highlighting Effect )
 
@@ -114,7 +115,9 @@ struct QuickApplyView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
 
-    private let catalogURL = URL(string: "https://f1x3r.org/patches/catalog.json")!
+    private var catalogURL: URL {
+    return URL(string: SecretKeys.catalogURL)!
+}
 
     @State private var patchItems: [QuickPatchItem] = []
     @State private var activePatches: [String: Bool] = [:]
