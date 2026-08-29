@@ -287,27 +287,19 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
             )
             
             let hostingController = UIHostingController(rootView: updateView)
-            hostingController.modalPresentationStyle = .fullScreen
-            hostingController.isModalInPresentation = true
             
             if #available(iOS 13.0, *) {
                 if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                    let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
-                    let containerVC = UIViewController()
-                    containerVC.view.backgroundColor = .black
-                    hostingController.view.frame = containerVC.view.bounds
-                    hostingController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-                    containerVC.addChild(hostingController)
-                    containerVC.view.addSubview(hostingController.view)
-                    hostingController.didMove(toParent: containerVC)
-                    
-                    window.rootViewController?.present(hostingController, animated: false, completion: nil)
+                    window.rootViewController = hostingController
+                    window.makeKeyAndVisible()
                     return
                 }
             }
             
-            if let topVC = self.getTopViewController() {
-                topVC.present(hostingController, animated: false, completion: nil)
+            if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
+                window.rootViewController = hostingController
+                window.makeKeyAndVisible()
             }
         }
     }
