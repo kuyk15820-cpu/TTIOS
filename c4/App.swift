@@ -32,30 +32,28 @@ struct ThreeOneOSFiveApp: App {
                     .environmentObject(fileOperationCoordinator)
                     .environment(\.appLanguage, language)
                     .environment(\.locale, language.locale)
-                    .opacity((showOnboarding || isCheckingUpdate) ? 0 : 1)
+                    .opacity(isCheckingUpdate ? 0 : 1)
                     .allowsHitTesting(!showOnboarding && !isCheckingUpdate)
 
-                // 2. หน้า Onboarding
-                if showOnboarding {
+                // 2. หน้า Splash Screen (แสดงผลทันทีเป็น Layer ลำดับแรก)
+                if isCheckingUpdate {
+                    AppSplashScreenView()
+                        .transition(.opacity)
+                        .zIndex(999)
+                }
+
+                // 3. หน้า Onboarding (แสดงผลหลังจากปิด Splash Screen หากยังตั้งค่าไม่เสร็จ)
+                if showOnboarding && !isCheckingUpdate {
                     OnboardingView {
                         OnboardingStore.markCompleted()
                         withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
                             showOnboarding = false
                         }
-                        appState.detectSupport()
-                        performUpdateCheck()
                     }
                     .environment(\.appLanguage, language)
                     .environment(\.locale, language.locale)
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                    .zIndex(1)
-                }
-
-                // 3. หน้า Splash Screen (พื้นหลังดำ + Spinner หมุนรอเช็คเวอร์ชัน)
-                if isCheckingUpdate && !showOnboarding {
-                    AppSplashScreenView()
-                        .transition(.opacity)
-                        .zIndex(999) // กำหนด zIndex ชั้นสูงสุด
+                    .zIndex(1000)
                 }
             }
             .displayIdentityAttribution(isPresented: $showAttribution, enabled: !showOnboarding && !isCheckingUpdate)
@@ -63,7 +61,10 @@ struct ThreeOneOSFiveApp: App {
                 DisplayAttributionSheet()
             }
             .onAppear {
-                if !showOnboarding {
+                // บังคับเปลี่ยน State ให้ SwiftUI รับรู้การวาด Splash Screen ใน Main Thread ก่อนรัน Async Task
+                isCheckingUpdate = true
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     appState.detectSupport()
                     performUpdateCheck()
                 }
@@ -80,13 +81,12 @@ struct ThreeOneOSFiveApp: App {
 
     // MARK: - Helper Function เช็คเวอร์ชันพร้อมหน่วงเวลา Splash Screen ขั้นต่ำ 1 วินาที
     private func performUpdateCheck() {
-        isCheckingUpdate = true
         let startTime = Date()
         
         AppUpdateCheckerManager.shared.checkVersion { needsUpdate, downloadUrl, releaseNotes, serverVersion in
             Task { @MainActor in
                 let elapsedTime = Date().timeIntervalSince(startTime)
-                let minDuration: TimeInterval = 1.0 // หน่วงขั้นต่ำ 1 วินาที
+                let minDuration: TimeInterval = 1.0 // หน่วงเวลาอย่างน้อย 1 วินาที
                 
                 if elapsedTime < minDuration {
                     let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
