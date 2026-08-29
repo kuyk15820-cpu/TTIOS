@@ -5,13 +5,12 @@ struct AppSplashScreenView: View {
 
     var body: some View {
         ZStack {
-            // Background ดำสนิท
+            // Background
             Color.black
                 .ignoresSafeArea()
 
-            // Spinner (ActivityIndicator) ตรงกลาง
+            // Spinner (ActivityIndicator)
             ActivityIndicator(isAnimating: isAnimating, style: .medium)
-                .scaleEffect(1.2)
         }
     }
 }
