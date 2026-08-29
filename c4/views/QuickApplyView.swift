@@ -19,22 +19,21 @@ struct NativeListRowButtonStyle: ButtonStyle {
 
 extension String {
     var toRelativeTimeText: String {
-        // 1. สร้าง Calendar ค.ศ. (gregorian) สำหรับใช้คำนวณแบบ Explicit
-        var gregorianCalendar = Calendar(identifier: .gregorian)
-        gregorianCalendar.locale = Locale(identifier: "th_TH")
+        // 1. บังคับ Parse String ด้วย Calendar gregorian (ค.ศ.) เสมอ
+        // เพื่อไม่ให้ดึง Calendar.current ของเครื่อง (ที่เป็น พ.ศ.) มาคิดซ้ำ
+        let gregorianRegion = Region(calendar: Calendars.gregorian, zone: Zones.current, locale: Locales.thai)
         
-        // 2. Parse Date จาก String
-        guard let date = self.toDate()?.date else {
+        guard let date = self.toDate(region: gregorianRegion)?.date else {
             return self
         }
         
         let now = Date()
         let safeDate = min(date, now)
         
-        // 3. ตั้งค่า Formatter พร้อมระบุ @calendar=gregorian ใน Locale Identifier
+        // 2. ตั้งค่า Formatter บังคับใช้ ค.ศ.
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = Locale(identifier: "th_TH@calendar=gregorian")
-        formatter.calendar = gregorianCalendar
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateTimeStyle = .named
         formatter.unitsStyle = .full
         
