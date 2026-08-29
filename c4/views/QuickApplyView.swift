@@ -18,22 +18,20 @@ struct NativeListRowButtonStyle: ButtonStyle {
 
 extension String {
     var toRelativeTimeText: String {
-        // สร้าง Region สำหรับภาษาไทย
-        let thaiRegion = Region(calendar: Calendars.gregorian, zone: Zones.asiaBangkok, locale: Locales.thai)
-        
-        // Parse ข้อความวันที่และกำหนด Region ให้เป็นภาษาไทยตั้งแต่การ Parse
-        guard let dateInRegion = self.toDate(region: thaiRegion) else {
+        // 1. ใช้ SwiftDate ช่วย Parse String วันที่ (รองรับ ISO8601 ทุกรูปแบบ)
+        guard let date = self.toDate()?.date else {
             return self
         }
         
-        let nowInThai = DateInRegion(region: thaiRegion)
+        let safeDate = min(date, Date())
         
-        // เปรียบเทียบเวลาถอยหลัง (Relative Time)
-        return dateInRegion.toRelative(
-            since: nowInThai,
-            dateTimeStyle: RelativeDateTimeFormatter.DateTimeStyle.named,
-            unitsStyle: RelativeDateTimeFormatter.UnitsStyle.short
-        )
+        // 2. ใช้ RelativeDateTimeFormatter ของ Native Swift แล้วบังคับ Locale เป็น th_TH
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(identifier: "th_TH")
+        formatter.dateTimeStyle = .named  // แสดงคำว่า "เมื่อวาน", "เมื่อสักครู่"
+        formatter.unitsStyle = .full      // แสดงคำว่า "นาทีที่แล้ว", "ชั่วโมงที่แล้ว"
+        
+        return formatter.localizedString(for: safeDate, relativeTo: Date())
     }
 }
 
