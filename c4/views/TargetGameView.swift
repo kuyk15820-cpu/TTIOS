@@ -9,7 +9,7 @@ struct TargetGameView: View {
         TargetGameApp(bundleID: "com.dts.freefiremax")        
     ]
 
-    // แอปของคุณที่จะแสดงเมื่อมีอัปเดตใหม่ (เปลี่ยน Bundle ID ให้เป็นของแอปคุณเอง)
+    // แอปของคุณที่จะแสดงเมื่อมีอัปเดตใหม่
     private let myOwnApps: [TargetGameApp] = [
         TargetGameApp(bundleID: "com.apple.mobile.MobileHouseArrest") 
     ]
@@ -61,6 +61,8 @@ struct TargetGameView: View {
             .onAppear {
                 updateManager.checkVersion()
             }
+            // 💡 บังคับให้ SwiftUI วาด UI ใหม่ทันทีเมื่อค่า isUpdateNeeded เปลี่ยนแปลง
+            .id(updateManager.isUpdateNeeded)
         }
     }
 }
