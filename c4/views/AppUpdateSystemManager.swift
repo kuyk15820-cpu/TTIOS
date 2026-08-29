@@ -31,7 +31,6 @@ class AppUpdateCheckerManager: ObservableObject {
     // MARK: - Private Configuration
     private var downloadTask: URLSessionDownloadTask?
     
-    // 💡 สร้าง URLSession ผูกกับ Delegate บน Main Queue (ห้ามใส่ Completion Handler ตอนสร้าง Task)
     private lazy var urlSession: URLSession = {
         let config = URLSessionConfiguration.default
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
@@ -39,16 +38,6 @@ class AppUpdateCheckerManager: ObservableObject {
     }()
     
     private init() {}
-    
-    // MARK: - Debug Helper Alert
-    func showDebugAlert(title: String, message: String) {
-        DispatchQueue.main.async {
-            guard let topVC = self.getTopViewController() else { return }
-            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "ตกลง", style: .default, handler: nil))
-            topVC.present(alert, animated: true, completion: nil)
-        }
-    }
     
     // MARK: - Start Checking Version
     func checkVersion(handler: UpdateCheckHandler? = nil) {
@@ -132,10 +121,7 @@ class AppUpdateCheckerManager: ObservableObject {
     
     // MARK: - Download Action
     func startDownload(from urlString: String) {
-        guard let url = URL(string: urlString) else {
-            showDebugAlert(title: "⚠️ Download Error", message: "URL ดาวน์โหลดไม่ถูกต้อง")
-            return
-        }
+        guard let url = URL(string: urlString) else { return }
         
         DispatchQueue.main.async {
             self.isDownloading = true
@@ -143,21 +129,18 @@ class AppUpdateCheckerManager: ObservableObject {
             self.downloadProgress = 0.0
             self.totalBytesWritten = 0
             self.totalBytesExpected = 0
-            self.downloadSizeText = "กำลังเริ่ม..."
+            self.downloadSizeText = "Downloading... (0%)"
             self.currentDownloadFileURL = nil
         }
         
         downloadTask?.cancel()
         
-        // 💡 เรียกใช้แบบไม่มี completionHandler เพื่อบังคับให้ Event วิ่งเข้า Delegate
         downloadTask = urlSession.downloadTask(with: url)
         
         NotificationCenter.default.removeObserver(self, name: Notification.Name("URLSessionDownloadProgress"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(downloadProgressChanged), name: Notification.Name("URLSessionDownloadProgress"), object: nil)
         
         downloadTask?.resume()
-        
-        showDebugAlert(title: "🚀 Status", message: "เริ่มดาวน์โหลดเรียบร้อยแล้ว\nURL: \(urlString)")
     }
     
     @objc private func downloadProgressChanged(notification: Notification) {
@@ -165,22 +148,16 @@ class AppUpdateCheckerManager: ObservableObject {
               let written = userInfo["written"] as? Int64,
               let expected = userInfo["expected"] as? Int64 else { return }
         
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useMB, .useKB, .useGB]
-        formatter.countStyle = .file
-        formatter.includesUnit = true
-        
-        let writtenString = formatter.string(fromByteCount: written)
         let sizeText: String
         let progress: Double
         
         if expected > 0 {
-            let expectedString = formatter.string(fromByteCount: expected)
-            sizeText = "\(writtenString) / \(expectedString)"
             progress = Double(written) / Double(expected)
+            let percentage = Int(progress * 100)
+            sizeText = "Downloading... (\(percentage)%)"
         } else {
-            sizeText = writtenString
             progress = 0.0
+            sizeText = "Downloading..."
         }
         
         DispatchQueue.main.async {
@@ -192,8 +169,7 @@ class AppUpdateCheckerManager: ObservableObject {
     }
     
     func handleDownloadCompletion(tempURL: URL, response: URLResponse?, error: Error?) {
-        if let error = error {
-            showDebugAlert(title: "❌ Download Failed", message: error.localizedDescription)
+        if error != nil {
             DispatchQueue.main.async {
                 self.isDownloading = false
                 self.isDownloaded = false
@@ -202,8 +178,6 @@ class AppUpdateCheckerManager: ObservableObject {
         }
         
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            showDebugAlert(title: "❌ Server Response Error", message: "HTTP Status Code: \(code)")
             DispatchQueue.main.async {
                 self.isDownloading = false
                 self.isDownloaded = false
@@ -231,7 +205,6 @@ class AppUpdateCheckerManager: ObservableObject {
                 self.presentShareSheet(for: finalFileURL)
             }
         } catch {
-            showDebugAlert(title: "❌ Save File Error", message: error.localizedDescription)
             DispatchQueue.main.async {
                 self.isDownloading = false
                 self.isDownloaded = false
