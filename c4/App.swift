@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Network
 
 @main
 struct ThreeOneOSFiveApp: App {
@@ -12,6 +13,10 @@ struct ThreeOneOSFiveApp: App {
     @State private var showAttribution = false
     @State private var isCheckingUpdate = true // เริ่มต้นเป็น true เพื่อแสดง Splash Screen
     @Environment(\.scenePhase) private var scenePhase
+
+    // ตัว Monitor ดักจับสถานะการเชื่อมต่ออินเทอร์เน็ต
+    private let networkMonitor = NWPathMonitor()
+    private let monitorQueue = DispatchQueue(label: "NetworkMonitorQueue")
 
     init() {
         setupLogCapture()
@@ -35,7 +40,7 @@ struct ThreeOneOSFiveApp: App {
                     .opacity(isCheckingUpdate ? 0 : 1)
                     .allowsHitTesting(!showOnboarding && !isCheckingUpdate)
 
-                // 2. หน้า Splash Screen (แสดงผลทันทีเป็น Layer ลำดับแรก)
+                // 2. หน้า Splash Screen (แสดงผลค้างไว้จนกว่าจะเช็คเวอร์ชันสำเร็จ)
                 if isCheckingUpdate {
                     AppSplashScreenView()
                         .transition(.opacity)
@@ -61,13 +66,9 @@ struct ThreeOneOSFiveApp: App {
                 DisplayAttributionSheet()
             }
             .onAppear {
-                // บังคับเปลี่ยน State ให้ SwiftUI รับรู้การวาด Splash Screen ใน Main Thread ก่อนรัน Async Task
                 isCheckingUpdate = true
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    appState.detectSupport()
-                    performUpdateCheck()
-                }
+                appState.detectSupport()
+                startNetworkMonitoring()
             }
             .onChange(of: scenePhase) { phase in
                 guard phase == .active, !showOnboarding else { return }
@@ -79,12 +80,30 @@ struct ThreeOneOSFiveApp: App {
         }
     }
 
+    // MARK: - Network Monitoring Logic
+    private func startNetworkMonitoring() {
+        networkMonitor.pathUpdateHandler = { path in
+            // เมื่อตรวจพบอินเทอร์เน็ต และระบบยังรอการเช็คเวอร์ชันอยู่
+            if path.status == .satisfied {
+                DispatchQueue.main.async {
+                    if self.isCheckingUpdate {
+                        self.performUpdateCheck()
+                    }
+                }
+            }
+        }
+        networkMonitor.start(queue: monitorQueue)
+    }
+
     // MARK: - Helper Function เช็คเวอร์ชันพร้อมหน่วงเวลา Splash Screen ขั้นต่ำ 1 วินาที
     private func performUpdateCheck() {
         let startTime = Date()
         
         AppUpdateCheckerManager.shared.checkVersion { needsUpdate, downloadUrl, releaseNotes, serverVersion in
             Task { @MainActor in
+                // หากการเชื่อมต่อล้มเหลว หรือได้ response ไม่สมบูรณ์ จะปล่อยให้ Splash Screen หมุนต่อเพื่อรอเน็ต
+                guard !serverVersion.isEmpty || needsUpdate else { return }
+
                 let elapsedTime = Date().timeIntervalSince(startTime)
                 let minDuration: TimeInterval = 1.0 // หน่วงเวลาอย่างน้อย 1 วินาที
                 
@@ -93,9 +112,11 @@ struct ThreeOneOSFiveApp: App {
                     try? await Task.sleep(nanoseconds: remainingTime)
                 }
                 
+                // เช็คสำเร็จ สั่งปิด Splash Screen และหยุด Monitor เน็ต
                 withAnimation(.easeOut(duration: 0.3)) {
                     self.isCheckingUpdate = false
                 }
+                self.networkMonitor.cancel()
                 
                 if needsUpdate {
                     AppUpdateCheckerManager.shared.presentUpdateUI(
