@@ -18,18 +18,19 @@ struct NativeListRowButtonStyle: ButtonStyle {
 
 extension String {
     var toRelativeTimeText: String {
-        // 1. ใช้ SwiftDate ช่วย Parse String วันที่ (รองรับ ISO8601 ทุกรูปแบบ)
+        // 1. ใช้ SwiftDate ช่วย Parse String วันที่
         guard let date = self.toDate()?.date else {
             return self
         }
         
         let safeDate = min(date, Date())
         
-        // 2. ใช้ RelativeDateTimeFormatter ของ Native Swift แล้วบังคับ Locale เป็น th_TH
+        // 2. ตั้งค่า Formatter บังคับใช้ Calendar แบบ ค.ศ. (gregorian)
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = Locale(identifier: "th_TH")
-        formatter.dateTimeStyle = .named  // แสดงคำว่า "เมื่อวาน", "เมื่อสักครู่"
-        formatter.unitsStyle = .full      // แสดงคำว่า "นาทีที่แล้ว", "ชั่วโมงที่แล้ว"
+        formatter.calendar = Calendar(identifier: .gregorian) // 👈 เพิ่มบรรทัดนี้เพื่อแก้ปัญหา 543 ปี
+        formatter.dateTimeStyle = .named
+        formatter.unitsStyle = .full
         
         return formatter.localizedString(for: safeDate, relativeTo: Date())
     }
