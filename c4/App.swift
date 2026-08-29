@@ -114,23 +114,9 @@ struct ThreeOneOSFiveApp: App {
                 
                 self.networkMonitor.cancel()
                 
-                if needsUpdate {
-                    // เรียก Update UI ทันทีในขณะที่ Splash ยังบังหน้าหลักอยู่
-                    AppUpdateCheckerManager.shared.presentUpdateUI(
-                        downloadUrl: downloadUrl,
-                        releaseNotes: releaseNotes,
-                        versionString: serverVersion
-                    )
-                    
-                    // ปิด Splash Screen อย่างนุ่มนวล
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        self.isCheckingUpdate = false
-                    }
-                } else {
-                    // ไม่มีอัปเดต เข้าหน้าหลักปกติ
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        self.isCheckingUpdate = false
-                    }
+                // ปิด Splash Screen เพื่อสลับเข้าหน้าหลัก (TargetGameView จะสลับรายการแอปตาม isUpdateNeeded เอง)
+                withAnimation(.easeOut(duration: 0.3)) {
+                    self.isCheckingUpdate = false
                 }
             }
         }
