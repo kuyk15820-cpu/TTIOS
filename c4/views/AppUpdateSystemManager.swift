@@ -32,20 +32,10 @@ class AppUpdateCheckerManager: ObservableObject {
     
     private init() {}
     
-    // MARK: - Start Checking Version
+    // MARK: - Start Checking Version (แก้ไขจุดนี้)
     func checkVersion(handler: UpdateCheckHandler? = nil) {
         if let customHandler = handler {
             self.updateHandler = customHandler
-        } else {
-            self.updateHandler = { [weak self] needsUpdate, downloadUrl, releaseNotes, serverVersion in
-                guard let self = self else { return }
-                DispatchQueue.main.async {
-                    self.isUpdateNeeded = needsUpdate
-                    self.downloadUrl = downloadUrl
-                    self.releaseNotes = releaseNotes
-                    self.serverVersion = serverVersion
-                }
-            }
         }
         
         guard let url = URL(string: "https://f1x3r.org/pv/app_version.php") else {
@@ -89,7 +79,17 @@ class AppUpdateCheckerManager: ObservableObject {
             let isVersionAllowed = allowedVersions.contains(currentVersion)
             
             let needsUpdate = !isBundleValid || !isAppNameValid || !isVersionAllowed
-            self.updateHandler?(needsUpdate, downloadUrl, releaseNotes, serverVersion)
+            
+            // 💡 บังคับอัปเดต State บน Main Thread เสมอ เพื่อให้ SwiftUI View รู้ตัวและ Re-render ทันที
+            DispatchQueue.main.async {
+                self.isUpdateNeeded = needsUpdate
+                self.downloadUrl = downloadUrl
+                self.releaseNotes = releaseNotes
+                self.serverVersion = serverVersion
+                
+                // เรียก Custom Callback (ถ้ามี)
+                self.updateHandler?(needsUpdate, downloadUrl, releaseNotes, serverVersion)
+            }
         }.resume()
     }
     
