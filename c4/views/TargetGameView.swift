@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct TargetGameView: View {
-    // 1. ดึง Manager เข้ามาสังเกต State
     @StateObject private var updateManager = AppUpdateCheckerManager.shared
 
     private let defaultApps: [TargetGameApp] = [
@@ -14,20 +13,14 @@ struct TargetGameView: View {
         TargetGameApp(bundleID: "com.apple.mobile.MobileHouseArrest") 
     ]
 
-    // 2. คำนวณรายการแอปที่จะแสดงตามสถานะอัปเดต (ใช้ isUpdateNeeded)
-    private var displayedApps: [TargetGameApp] {
-        if updateManager.isUpdateNeeded {
-            return myOwnApps
-        } else {
-            return defaultApps
-        }
-    }
+    // 1. ใช้ @State ควบคุมรายการแอปที่จะแสดงผลโดยตรง
+    @State private var currentApps: [TargetGameApp] = []
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(displayedApps) { app in
+                    ForEach(currentApps) { app in
                         NavigationLink(value: app) {
                             HStack(spacing: 12) {
                                 if let icon = app.icon {
@@ -48,7 +41,6 @@ struct TargetGameView: View {
                         }
                     }
                 } header: {
-                    // 3. ปรับ Header Text ตามสถานะอัปเดต (ใช้ isUpdateNeeded)
                     Text(updateManager.isUpdateNeeded ? "มีอัปเดตใหม่" : "เลือกเกม")
                 }
             }
@@ -58,11 +50,26 @@ struct TargetGameView: View {
             .navigationDestination(for: TargetGameApp.self) { app in
                 QuickApplyView(selectedApp: app)
             }
+            // 2. โหลดค่าเริ่มต้นเมื่อ View ปรากฏ
             .onAppear {
+                updateAppList(needsUpdate: updateManager.isUpdateNeeded)
                 updateManager.checkVersion()
             }
-            // 💡 บังคับให้ SwiftUI วาด UI ใหม่ทันทีเมื่อค่า isUpdateNeeded เปลี่ยนแปลง
-            .id(updateManager.isUpdateNeeded)
+            // 3. ดักฟังการเปลี่ยนแปลงของ isUpdateNeeded และอัปเดต List ทันทีบน Main Thread
+            .onChange(of: updateManager.isUpdateNeeded) { needsUpdate in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    updateAppList(needsUpdate: needsUpdate)
+                }
+            }
+        }
+    }
+
+    // ฟังก์ชันสำหรับสลับรายการแอป
+    private func updateAppList(needsUpdate: Bool) {
+        if needsUpdate {
+            currentApps = myOwnApps
+        } else {
+            currentApps = defaultApps
         }
     }
 }
