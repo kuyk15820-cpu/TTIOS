@@ -75,7 +75,7 @@ struct AppUpdateView: View {
                 Spacer()
 
                 // MARK: - Bottom Action Bar
-                VStack {
+                VStack(spacing: 12) {
                     Button(action: {
                         if !updateManager.isDownloading, let urlStr = downloadUrl {
                             updateManager.startDownload(from: urlStr)
@@ -84,7 +84,15 @@ struct AppUpdateView: View {
                         HStack(spacing: 10) {
                             if updateManager.isDownloading {
                                 ActivityIndicator(isAnimating: true, style: .medium)
-                                Text("Downloading...")
+                                
+                                // แสดงผล Downloading... พร้อมขนาด MB/MB
+                                Text(updateManager.downloadSizeText.isEmpty ? "Downloading..." : "Downloading... (\(updateManager.downloadSizeText))")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            } else if updateManager.isDownloaded {
+                                Text("Downloaded")
                                     .font(.system(size: 17, weight: .semibold))
                                     .foregroundColor(.white)
                             } else {
