@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import SwiftUI
 
+// MARK: - AppUpdateCheckerManager
 class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น ObservableObject เพื่อให้ View สังเกตสถานะได้
     
     static let shared = AppUpdateCheckerManager()
@@ -323,5 +324,18 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
             return getTopViewController(base: presented)
         }
         return baseVC
+    }
+}
+
+// MARK: - Helper Extension to post Notification for URLSessionDownloadTask Progress
+class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
+    static let shared = DownloadProgressDelegate()
+    
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        NotificationCenter.default.post(name: Notification.Name("URLSessionDownloadProgress"), object: downloadTask)
+    }
+    
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        // Handled via completion block in dataTask/downloadTask directly
     }
 }
