@@ -18,21 +18,21 @@ struct NativeListRowButtonStyle: ButtonStyle {
 
 extension String {
     var toRelativeTimeText: String {
-        // Parse ข้อความวันที่ให้กลายเป็น DateInRegion ของ SwiftDate
-        guard let dateInRegion = self.toDate() else {
+        // สร้าง Region สำหรับภาษาไทย
+        let thaiRegion = Region(calendar: Calendars.gregorian, zone: Zones.asiaBangkok, locale: Locales.thai)
+        
+        // Parse ข้อความวันที่และกำหนด Region ให้เป็นภาษาไทยตั้งแต่การ Parse
+        guard let dateInRegion = self.toDate(region: thaiRegion) else {
             return self
         }
         
-        // กำหนด Region ให้เป็นภาษาไทย (th_TH)
-        let thaiRegion = Region(calendar: Calendars.gregorian, zone: Zones.asiaBangkok, locale: Locales.thai)
-        let dateInThai = dateInRegion.in(region: thaiRegion)
-        let nowInThai = Date().in(region: thaiRegion)
+        let nowInThai = DateInRegion(region: thaiRegion)
         
-        // เปรียบเทียบเวลาถอยหลัง ( Relative Time )
-        return dateInThai.toRelative(
+        // เปรียบเทียบเวลาถอยหลัง (Relative Time)
+        return dateInRegion.toRelative(
             since: nowInThai,
-            dateTimeStyle: .named,
-            unitsStyle: .short
+            dateTimeStyle: RelativeDateTimeFormatter.DateTimeStyle.named,
+            unitsStyle: RelativeDateTimeFormatter.UnitsStyle.short
         )
     }
 }
