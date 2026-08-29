@@ -101,8 +101,11 @@ struct ThreeOneOSFiveApp: App {
         
         AppUpdateCheckerManager.shared.checkVersion { needsUpdate, downloadUrl, releaseNotes, serverVersion in
             Task { @MainActor in
-                // หากการเชื่อมต่อล้มเหลว หรือได้ response ไม่สมบูรณ์ จะปล่อยให้ Splash Screen หมุนต่อเพื่อรอเน็ต
-                guard !serverVersion.isEmpty || needsUpdate else { return }
+                // 🟢 แก้ไขจุดบัค: เช็คว่าหาก Request ล้มเหลว (ค่าว่างและไม่มีเน็ต) ให้ return ข้ามไปรอเน็ตใหม่
+                // แต่ถ้า Server ตอบกลับแล้ว (ถึงแม้อัปเดตจะเป็น false) จะทำงานบรรทัดล่างต่อเพื่อปิด Splash Screen
+                if serverVersion.isEmpty && !needsUpdate && downloadUrl == nil {
+                    return 
+                }
 
                 let elapsedTime = Date().timeIntervalSince(startTime)
                 let minDuration: TimeInterval = 1.0 // หน่วงเวลาอย่างน้อย 1 วินาที
@@ -112,12 +115,13 @@ struct ThreeOneOSFiveApp: App {
                     try? await Task.sleep(nanoseconds: remainingTime)
                 }
                 
-                // เช็คสำเร็จ สั่งปิด Splash Screen และหยุด Monitor เน็ต
+                // 🟢 เช็คสำเร็จ สั่งปิด Splash Screen เข้าหน้าหลักเสมอ
                 withAnimation(.easeOut(duration: 0.3)) {
                     self.isCheckingUpdate = false
                 }
                 self.networkMonitor.cancel()
                 
+                // ถ้ามีอัปเดตค่อยแสดงผล Update UI
                 if needsUpdate {
                     AppUpdateCheckerManager.shared.presentUpdateUI(
                         downloadUrl: downloadUrl,
