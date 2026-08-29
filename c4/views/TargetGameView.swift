@@ -1,16 +1,33 @@
 import SwiftUI
 
 struct TargetGameView: View {
-    private let targetApps: [TargetGameApp] = [
+    // 1. ดึง Manager เข้ามาสังเกต State
+    @StateObject private var updateManager = AppUpdateCheckerManager.shared
+
+    private let defaultApps: [TargetGameApp] = [
         TargetGameApp(bundleID: "com.dts.freefireth"),
         TargetGameApp(bundleID: "com.dts.freefiremax")        
     ]
+
+    // แอปของคุณที่จะแสดงเมื่อมีอัปเดตใหม่ (เปลี่ยน Bundle ID ให้เป็นของแอปคุณเอง)
+    private let myOwnApps: [TargetGameApp] = [
+        TargetGameApp(bundleID: "com.apple.mobile.MobileHouseArrest") 
+    ]
+
+    // 2. คำนวณรายการแอปที่จะแสดงตามสถานะอัปเดต (ใช้ isUpdateNeeded)
+    private var displayedApps: [TargetGameApp] {
+        if updateManager.isUpdateNeeded {
+            return myOwnApps
+        } else {
+            return defaultApps
+        }
+    }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(targetApps) { app in
+                    ForEach(displayedApps) { app in
                         NavigationLink(value: app) {
                             HStack(spacing: 12) {
                                 if let icon = app.icon {
@@ -31,14 +48,18 @@ struct TargetGameView: View {
                         }
                     }
                 } header: {
-                    Text("เลือกเกม")
+                    // 3. ปรับ Header Text ตามสถานะอัปเดต (ใช้ isUpdateNeeded)
+                    Text(updateManager.isUpdateNeeded ? "มีอัปเดตใหม่" : "เลือกเกม")
                 }
             }
             .listStyle(.plain)
-            .navigationTitle("หน้าแรก")
+            .navigationTitle(updateManager.isUpdateNeeded ? "อัปเดตซอฟต์แวร์" : "หน้าแรก")
             .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: TargetGameApp.self) { app in
                 QuickApplyView(selectedApp: app)
+            }
+            .onAppear {
+                updateManager.checkVersion()
             }
         }
     }
