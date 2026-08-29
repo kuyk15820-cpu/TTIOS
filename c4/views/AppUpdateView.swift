@@ -77,7 +77,7 @@ struct AppUpdateView: View {
                 // MARK: - Bottom Action Bar
                 VStack(spacing: 12) {
                     Button(action: {
-                        if !updateManager.isDownloading, let urlStr = downloadUrl {
+                        if !updateManager.isDownloading && !updateManager.isDone, let urlStr = downloadUrl {
                             updateManager.startDownload(from: urlStr)
                         }
                     }) {
@@ -85,14 +85,16 @@ struct AppUpdateView: View {
                             if updateManager.isDownloading {
                                 ActivityIndicator(isAnimating: true, style: .medium)
                                 
-                                // แสดงผล Downloading... (XX%) จาก Manager
                                 Text(updateManager.downloadSizeText.isEmpty ? "Downloading..." : updateManager.downloadSizeText)
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.white)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
-                            } else if updateManager.isDownloaded {
-                                Text("Downloaded")
+                            } else if updateManager.isDone {
+                                Image(systemName: "checkmark.circle")
+                                    .foregroundColor(.white)
+                                
+                                Text("Done")
                                     .font(.system(size: 17, weight: .semibold))
                                     .foregroundColor(.white)
                             } else {
@@ -110,7 +112,7 @@ struct AppUpdateView: View {
                                 .stroke(Color.white, lineWidth: 1.5)
                         )
                     }
-                    .disabled(updateManager.isDownloading)
+                    .disabled(updateManager.isDownloading || updateManager.isDone)
                 }
                 .padding(.horizontal, 28)
                 .padding(.vertical, 16)
