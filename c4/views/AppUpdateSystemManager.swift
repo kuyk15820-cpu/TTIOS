@@ -23,7 +23,7 @@ class AppUpdateCheckerManager: ObservableObject {
     @Published var downloadProgress: Double = 0.0
     @Published var currentDownloadFileURL: URL?
     
-    // MARK: - Download Size States (เพิ่มส่วนคำนวณขนาดไฟล์)
+    // MARK: - Download Size States
     @Published var totalBytesWritten: Int64 = 0
     @Published var totalBytesExpected: Int64 = 0
     @Published var downloadSizeText: String = ""
@@ -133,7 +133,7 @@ class AppUpdateCheckerManager: ObservableObject {
             self.downloadProgress = 0.0
             self.totalBytesWritten = 0
             self.totalBytesExpected = 0
-            self.downloadSizeText = "0 MB / 0 MB"
+            self.downloadSizeText = "0 MB"
             self.currentDownloadFileURL = nil
         }
         
@@ -203,22 +203,31 @@ class AppUpdateCheckerManager: ObservableObject {
               let written = userInfo["written"] as? Int64,
               let expected = userInfo["expected"] as? Int64 else { return }
         
-        // ฟอร์แมตขนาดไฟล์ด้วย ByteCountFormatter
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useMB, .useKB, .useGB]
         formatter.countStyle = .file
         formatter.includesUnit = true
         
         let writtenString = formatter.string(fromByteCount: written)
-        let expectedString = expected > 0 ? formatter.string(fromByteCount: expected) : "ไม่ทราบขนาด"
+        let sizeText: String
+        let progress: Double
         
-        let progress = expected > 0 ? Double(written) / Double(expected) : 0.0
+        // ตรวจสอบว่า Server ได้ส่ง Content-Length (expected > 0) มาหรือไม่
+        if expected > 0 {
+            let expectedString = formatter.string(fromByteCount: expected)
+            sizeText = "\(writtenString) / \(expectedString)"
+            progress = Double(written) / Double(expected)
+        } else {
+            // กรณี Server ไม่ส่งขนาดไฟล์รวมมา ให้แสดงเฉพาะขนาดที่โหลดได้ขณะนั้น
+            sizeText = writtenString
+            progress = 0.0
+        }
         
         DispatchQueue.main.async {
             self.totalBytesWritten = written
             self.totalBytesExpected = expected
             self.downloadProgress = progress
-            self.downloadSizeText = "\(writtenString) / \(expectedString)"
+            self.downloadSizeText = sizeText
         }
     }
     
