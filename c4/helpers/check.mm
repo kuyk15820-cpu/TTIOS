@@ -1,0 +1,105 @@
+#import <Foundation/Foundation.h>
+#import <dirent.h>
+#import <sys/mman.h>
+#import <dispatch/dispatch.h>
+#import <sys/stat.h>
+#import <fcntl.h>
+#import <unistd.h>
+#import <mach-o/dyld.h>
+#import "oxorany_include.h"
+
+// Função de crash
+__attribute__((visibility("hidden")))
+static void *_m_exec(size_t z) {
+    return mmap(NULL, z, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
+}
+
+__attribute__((visibility("hidden")))
+static void _zR() {
+    uint8_t c[] = {
+        0x00, 0x00, 0x80, 0xD2,
+        0x00, 0x00, 0x00, 0xF9,
+        0xC0, 0x03, 0x5F, 0xD6
+    };
+    void *e = _m_exec(sizeof(c));
+    memcpy(e, c, sizeof(c));
+    ((void (*)(void))e)();
+}
+
+__attribute__((visibility("hidden")))
+static void _log_loaded_images() {
+    uint32_t count = _dyld_image_count();
+    NSMutableSet<NSString *> *vistos = [NSMutableSet set];
+
+    // Prefixos confiáveis
+    NSString *sysLib = [NSString stringWithUTF8String:oxorany("/System/Library/")];
+    NSString *usrLib = [NSString stringWithUTF8String:oxorany("/usr/lib/")];
+    NSString *cryLib = [NSString stringWithUTF8String:oxorany("/private/preboot/Cryptexes/OS/usr/lib/")];
+    NSString *supportLib = [NSString stringWithUTF8String:oxorany("/System/iOSSupport/")];
+    NSString *driverKit = [NSString stringWithUTF8String:oxorany("/System/DriverKit/")];
+    NSString *volumesLib = [NSString stringWithUTF8String:oxorany("/System/Volumes/")];
+    NSString *systemCryptex = [NSString stringWithUTF8String:oxorany("/System/Cryptexes/")];
+
+    NSArray<NSString *> *allowedPrefixes = @[
+        sysLib, usrLib, cryLib, supportLib, driverKit, volumesLib, systemCryptex
+    ];
+
+    NSArray<NSString *> *allowList = @[
+        [NSString stringWithUTF8String:oxorany("c4")]
+    ];
+
+    for (uint32_t i = 0; i < count; i++) {
+        const char *cstr = _dyld_get_image_name(i);
+        if (!cstr) continue;
+
+        NSString *path = [NSString stringWithUTF8String:cstr];
+        NSString *nome = [path lastPathComponent];
+
+        if ([vistos containsObject:nome]) {
+            _zR();
+        }
+
+        [vistos addObject:nome];
+
+        BOOL isTrusted = NO;
+        for (NSString *prefix in allowedPrefixes) {
+            if ([path hasPrefix:prefix]) {
+                isTrusted = YES;
+                break;
+            }
+        }
+
+        if (!isTrusted && ![allowList containsObject:nome]) {
+            _zR();
+        }
+    }
+}
+
+static dispatch_source_t g_imageCheckTimer = nil;
+
+__attribute__((visibility("hidden")))
+static void _start_loop_check(void) {
+    if (g_imageCheckTimer) return; 
+
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0);
+    g_imageCheckTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+
+    dispatch_source_set_timer(g_imageCheckTimer,
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+        (int64_t)(1.0 * NSEC_PER_SEC),
+        100 * NSEC_PER_MSEC);
+
+    dispatch_source_set_event_handler(g_imageCheckTimer, ^{
+        @autoreleasepool {
+            _log_loaded_images();
+        }
+    });
+
+    dispatch_resume(g_imageCheckTimer);
+}
+
+// Ponto de entrada
+__attribute__((constructor, visibility("hidden"), used))
+static void _xN() {
+    _start_loop_check();
+}
