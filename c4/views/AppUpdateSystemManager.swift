@@ -239,7 +239,7 @@ class AppUpdateCheckerManager: ObservableObject {
                 let finalFileURL = downloadDir.appendingPathComponent(suggestedFilename)
                 
                 if fileManager.fileExists(atPath: finalFileURL.path) {
-                    try fileManager.removeItem(at: fileURL)
+                    try fileManager.removeItem(at: finalFileURL)
                 }
                 
                 try fileManager.moveItem(at: tempURL, to: finalFileURL)
