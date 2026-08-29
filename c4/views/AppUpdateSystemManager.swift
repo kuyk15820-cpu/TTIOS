@@ -23,6 +23,11 @@ class AppUpdateCheckerManager: ObservableObject {
     @Published var downloadProgress: Double = 0.0
     @Published var currentDownloadFileURL: URL?
     
+    // MARK: - Download Size States (เพิ่มส่วนคำนวณขนาดไฟล์)
+    @Published var totalBytesWritten: Int64 = 0
+    @Published var totalBytesExpected: Int64 = 0
+    @Published var downloadSizeText: String = ""
+    
     // MARK: - Private Configuration
     private var downloadTask: URLSessionDownloadTask?
     private lazy var urlSession: URLSession = {
@@ -32,7 +37,7 @@ class AppUpdateCheckerManager: ObservableObject {
     
     private init() {}
     
-    // MARK: - Start Checking Version (แก้ไขจุดนี้)
+    // MARK: - Start Checking Version
     func checkVersion(handler: UpdateCheckHandler? = nil) {
         if let customHandler = handler {
             self.updateHandler = customHandler
@@ -80,14 +85,12 @@ class AppUpdateCheckerManager: ObservableObject {
             
             let needsUpdate = !isBundleValid || !isAppNameValid || !isVersionAllowed
             
-            // 💡 บังคับอัปเดต State บน Main Thread เสมอ เพื่อให้ SwiftUI View รู้ตัวและ Re-render ทันที
             DispatchQueue.main.async {
                 self.isUpdateNeeded = needsUpdate
                 self.downloadUrl = downloadUrl
                 self.releaseNotes = releaseNotes
                 self.serverVersion = serverVersion
                 
-                // เรียก Custom Callback (ถ้ามี)
                 self.updateHandler?(needsUpdate, downloadUrl, releaseNotes, serverVersion)
             }
         }.resume()
@@ -128,6 +131,9 @@ class AppUpdateCheckerManager: ObservableObject {
             self.isDownloading = true
             self.isDownloaded = false
             self.downloadProgress = 0.0
+            self.totalBytesWritten = 0
+            self.totalBytesExpected = 0
+            self.downloadSizeText = "0 MB / 0 MB"
             self.currentDownloadFileURL = nil
         }
         
@@ -192,13 +198,27 @@ class AppUpdateCheckerManager: ObservableObject {
     
     @objc private func downloadProgressChanged(notification: Notification) {
         guard let task = notification.object as? URLSessionDownloadTask,
-              task == downloadTask else { return }
+              task == downloadTask,
+              let userInfo = notification.userInfo,
+              let written = userInfo["written"] as? Int64,
+              let expected = userInfo["expected"] as? Int64 else { return }
         
-        if task.countOfBytesExpectedToReceive > 0 {
-            let progress = Double(task.countOfBytesReceived) / Double(task.countOfBytesExpectedToReceive)
-            DispatchQueue.main.async {
-                self.downloadProgress = progress
-            }
+        // ฟอร์แมตขนาดไฟล์ด้วย ByteCountFormatter
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useKB, .useGB]
+        formatter.countStyle = .file
+        formatter.includesUnit = true
+        
+        let writtenString = formatter.string(fromByteCount: written)
+        let expectedString = expected > 0 ? formatter.string(fromByteCount: expected) : "ไม่ทราบขนาด"
+        
+        let progress = expected > 0 ? Double(written) / Double(expected) : 0.0
+        
+        DispatchQueue.main.async {
+            self.totalBytesWritten = written
+            self.totalBytesExpected = expected
+            self.downloadProgress = progress
+            self.downloadSizeText = "\(writtenString) / \(expectedString)"
         }
     }
     
@@ -256,7 +276,15 @@ class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
     static let shared = DownloadProgressDelegate()
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        NotificationCenter.default.post(name: Notification.Name("URLSessionDownloadProgress"), object: downloadTask)
+        let userInfo: [String: Any] = [
+            "written": totalBytesWritten,
+            "expected": totalBytesExpectedToWrite
+        ]
+        NotificationCenter.default.post(
+            name: Notification.Name("URLSessionDownloadProgress"),
+            object: downloadTask,
+            userInfo: userInfo
+        )
     }
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) { }
