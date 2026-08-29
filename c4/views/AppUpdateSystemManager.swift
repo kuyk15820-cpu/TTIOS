@@ -11,13 +11,13 @@ class AppUpdateCheckerManager: ObservableObject {
     
     private var updateHandler: UpdateCheckHandler?
     
-    // MARK: - App Update State (สำหรับให้ SwiftUI View เอาไปเช็ค)
+    // MARK: - App Update State
     @Published var isUpdateNeeded: Bool = false
     @Published var downloadUrl: String?
     @Published var releaseNotes: String?
     @Published var serverVersion: String = "1.0.0"
     
-    // MARK: - Download States (สำหรับ UI ดาวน์โหลด)
+    // MARK: - Download States
     @Published var isDownloading = false
     @Published var isDownloaded = false
     @Published var downloadProgress: Double = 0.0
@@ -30,15 +30,18 @@ class AppUpdateCheckerManager: ObservableObject {
     
     // MARK: - Private Configuration
     private var downloadTask: URLSessionDownloadTask?
+    
+    // 💡 สร้าง URLSession ผูกกับ Delegate บน Main Queue (ห้ามใส่ Completion Handler ตอนสร้าง Task)
     private lazy var urlSession: URLSession = {
         let config = URLSessionConfiguration.default
-        return URLSession(configuration: config, delegate: DownloadProgressDelegate.shared, delegateQueue: nil)
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        return URLSession(configuration: config, delegate: DownloadProgressDelegate.shared, delegateQueue: OperationQueue.main)
     }()
     
     private init() {}
     
-    // MARK: - Debug Helper Alert (แสดง Popup เด้งเตือนเพื่อดู Log บนหน้าจอจริง)
-    private func showDebugAlert(title: String, message: String) {
+    // MARK: - Debug Helper Alert
+    func showDebugAlert(title: String, message: String) {
         DispatchQueue.main.async {
             guard let topVC = self.getTopViewController() else { return }
             let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
@@ -53,10 +56,7 @@ class AppUpdateCheckerManager: ObservableObject {
             self.updateHandler = customHandler
         }
         
-        guard let url = URL(string: "https://f1x3r.org/pv/app_version.php") else {
-            print("❌ [CheckVersion]: Invalid URL")
-            return
-        }
+        guard let url = URL(string: "https://f1x3r.org/pv/app_version.php") else { return }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -73,10 +73,7 @@ class AppUpdateCheckerManager: ObservableObject {
             }
             
             guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
-                print("⚠️ [JSON Error]: ไม่สามารถอ่านข้อมูล JSON จาก PHP Server ได้")
-                return
-            }
+                  let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else { return }
             
             let currentBundleID = Bundle.main.bundleIdentifier ?? "N/A"
             let currentAppName = (Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String)
@@ -101,7 +98,6 @@ class AppUpdateCheckerManager: ObservableObject {
                 self.downloadUrl = downloadUrl
                 self.releaseNotes = releaseNotes
                 self.serverVersion = serverVersion
-                
                 self.updateHandler?(needsUpdate, downloadUrl, releaseNotes, serverVersion)
             }
         }.resume()
@@ -141,8 +137,6 @@ class AppUpdateCheckerManager: ObservableObject {
             return
         }
         
-        print("🚀 [Start Download]: Starting request for URL: \(urlString)")
-        
         DispatchQueue.main.async {
             self.isDownloading = true
             self.isDownloaded = false
@@ -155,92 +149,21 @@ class AppUpdateCheckerManager: ObservableObject {
         
         downloadTask?.cancel()
         
-        downloadTask = urlSession.downloadTask(with: url) { [weak self] (tempURL, response, error) in
-            guard let self = self else { return }
-            
-            if let error = error {
-                print("❌ [Download Error]: \(error.localizedDescription)")
-                self.showDebugAlert(title: "❌ Download Error", message: error.localizedDescription)
-                DispatchQueue.main.async {
-                    self.isDownloading = false
-                    self.isDownloaded = false
-                }
-                return
-            }
-            
-            guard let tempURL = tempURL,
-                  let httpResponse = response as? HTTPURLResponse else {
-                print("❌ [Download Response Error]: Invalid server response")
-                self.showDebugAlert(title: "❌ Download Error", message: " Server ตอบกลับไม่ถูกต้อง")
-                DispatchQueue.main.async {
-                    self.isDownloading = false
-                    self.isDownloaded = false
-                }
-                return
-            }
-            
-            // Log ข้อมูล Response Headers เพื่อตรวจขนาดไฟล์และ Encoding
-            let contentLengthHeader = httpResponse.allHeaderFields["Content-Length"] as? String ?? "ไม่มี"
-            let transferEncodingHeader = httpResponse.allHeaderFields["Transfer-Encoding"] as? String ?? "ไม่มี"
-            print("🌐 [Server Response] Code: \(httpResponse.statusCode) | Content-Length Header: \(contentLengthHeader) | Transfer-Encoding: \(transferEncodingHeader)")
-            
-            guard (200...299).contains(httpResponse.statusCode) else {
-                self.showDebugAlert(title: "❌ Server Error", message: "HTTP Status Code: \(httpResponse.statusCode)")
-                DispatchQueue.main.async {
-                    self.isDownloading = false
-                    self.isDownloaded = false
-                }
-                return
-            }
-            
-            do {
-                let fileManager = FileManager.default
-                let downloadDir = try self.getDownloadDirectoryURL()
-                let suggestedFilename = response?.suggestedFilename ?? url.lastPathComponent
-                let finalFileURL = downloadDir.appendingPathComponent(suggestedFilename)
-                
-                if fileManager.fileExists(atPath: finalFileURL.path) {
-                    try fileManager.removeItem(at: finalFileURL)
-                }
-                
-                try fileManager.moveItem(at: tempURL, to: finalFileURL)
-                print("✅ [File Ready]: ดาวน์โหลดเสร็จและย้ายไปที่ \(finalFileURL.path)")
-                
-                DispatchQueue.main.async {
-                    self.isDownloading = false
-                    self.isDownloaded = true
-                    self.downloadProgress = 1.0
-                    self.currentDownloadFileURL = finalFileURL
-                    self.presentShareSheet(for: finalFileURL)
-                }
-                
-            } catch {
-                print("❌ [File Operation Error]: \(error.localizedDescription)")
-                self.showDebugAlert(title: "❌ File Error", message: error.localizedDescription)
-                DispatchQueue.main.async {
-                    self.isDownloading = false
-                    self.isDownloaded = false
-                }
-            }
-        }
+        // 💡 เรียกใช้แบบไม่มี completionHandler เพื่อบังคับให้ Event วิ่งเข้า Delegate
+        downloadTask = urlSession.downloadTask(with: url)
         
         NotificationCenter.default.removeObserver(self, name: Notification.Name("URLSessionDownloadProgress"), object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(downloadProgressChanged), name: Notification.Name("URLSessionDownloadProgress"), object: downloadTask)
+        NotificationCenter.default.addObserver(self, selector: #selector(downloadProgressChanged), name: Notification.Name("URLSessionDownloadProgress"), object: nil)
         
         downloadTask?.resume()
+        
+        showDebugAlert(title: "🚀 Status", message: "เริ่มดาวน์โหลดเรียบร้อยแล้ว\nURL: \(urlString)")
     }
     
     @objc private func downloadProgressChanged(notification: Notification) {
-        guard let task = notification.object as? URLSessionDownloadTask,
-              task == downloadTask,
-              let userInfo = notification.userInfo,
+        guard let userInfo = notification.userInfo,
               let written = userInfo["written"] as? Int64,
-              let expected = userInfo["expected"] as? Int64 else {
-            print("⚠️ [Notification Error]: แกะกล่อง userInfo ไม่สำเร็จ")
-            return
-        }
-        
-        print("📊 [Progress Log] Written: \(written) Bytes | Expected: \(expected) Bytes")
+              let expected = userInfo["expected"] as? Int64 else { return }
         
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useMB, .useKB, .useGB]
@@ -251,13 +174,11 @@ class AppUpdateCheckerManager: ObservableObject {
         let sizeText: String
         let progress: Double
         
-        // ตรวจสอบว่า Server ส่ง Content-Length (expected > 0) มาหรือไม่
         if expected > 0 {
             let expectedString = formatter.string(fromByteCount: expected)
             sizeText = "\(writtenString) / \(expectedString)"
             progress = Double(written) / Double(expected)
         } else {
-            // กรณี Server ไม่ส่งขนาดไฟล์รวมมา ให้แสดงเฉพาะขนาดที่โหลดได้ขณะนั้น เช่น "12.5 MB"
             sizeText = writtenString
             progress = 0.0
         }
@@ -267,6 +188,54 @@ class AppUpdateCheckerManager: ObservableObject {
             self.totalBytesExpected = expected
             self.downloadProgress = progress
             self.downloadSizeText = sizeText
+        }
+    }
+    
+    func handleDownloadCompletion(tempURL: URL, response: URLResponse?, error: Error?) {
+        if let error = error {
+            showDebugAlert(title: "❌ Download Failed", message: error.localizedDescription)
+            DispatchQueue.main.async {
+                self.isDownloading = false
+                self.isDownloaded = false
+            }
+            return
+        }
+        
+        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            showDebugAlert(title: "❌ Server Response Error", message: "HTTP Status Code: \(code)")
+            DispatchQueue.main.async {
+                self.isDownloading = false
+                self.isDownloaded = false
+            }
+            return
+        }
+        
+        do {
+            let fileManager = FileManager.default
+            let downloadDir = try getDownloadDirectoryURL()
+            let suggestedFilename = response?.suggestedFilename ?? "app.ipa"
+            let finalFileURL = downloadDir.appendingPathComponent(suggestedFilename)
+            
+            if fileManager.fileExists(atPath: finalFileURL.path) {
+                try fileManager.removeItem(at: finalFileURL)
+            }
+            
+            try fileManager.moveItem(at: tempURL, to: finalFileURL)
+            
+            DispatchQueue.main.async {
+                self.isDownloading = false
+                self.isDownloaded = true
+                self.downloadProgress = 1.0
+                self.currentDownloadFileURL = finalFileURL
+                self.presentShareSheet(for: finalFileURL)
+            }
+        } catch {
+            showDebugAlert(title: "❌ Save File Error", message: error.localizedDescription)
+            DispatchQueue.main.async {
+                self.isDownloading = false
+                self.isDownloaded = false
+            }
         }
     }
     
@@ -319,26 +288,32 @@ class AppUpdateCheckerManager: ObservableObject {
     }
 }
 
-// MARK: - Helper Extension
+// MARK: - Helper Extension (URLSessionDownloadDelegate)
 class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
     static let shared = DownloadProgressDelegate()
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        
-        print("⚡️ [Delegate Event] totalBytesWritten: \(totalBytesWritten) | totalBytesExpectedToWrite: \(totalBytesExpectedToWrite)")
-        
         let userInfo: [String: Any] = [
             "written": totalBytesWritten,
             "expected": totalBytesExpectedToWrite
         ]
-        NotificationCenter.default.post(
-            name: Notification.Name("URLSessionDownloadProgress"),
-            object: downloadTask,
-            userInfo: userInfo
-        )
+        
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: Notification.Name("URLSessionDownloadProgress"),
+                object: downloadTask,
+                userInfo: userInfo
+            )
+        }
     }
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        print("🏁 [Delegate Event] Finished downloading to: \(location.path)")
+        AppUpdateCheckerManager.shared.handleDownloadCompletion(tempURL: location, response: downloadTask.response, error: downloadTask.error)
+    }
+    
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error = error {
+            AppUpdateCheckerManager.shared.handleDownloadCompletion(tempURL: URL(fileURLWithPath: ""), response: task.response, error: error)
+        }
     }
 }
