@@ -10,6 +10,7 @@ struct ThreeOneOSFiveApp: App {
     
     @State private var showOnboarding = false 
     @State private var showAttribution = false
+    @State private var isCheckingUpdate = true // State สำหรับคุมการแสดง Splash Screen
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -24,15 +25,17 @@ struct ThreeOneOSFiveApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
+                // 1. หน้าหลักของแอป
                 ContentView()
                     .environmentObject(appState)
                     .environmentObject(patchDraftCoordinator)
                     .environmentObject(fileOperationCoordinator)
                     .environment(\.appLanguage, language)
                     .environment(\.locale, language.locale)
-                    .opacity(showOnboarding ? 0 : 1)
-                    .allowsHitTesting(!showOnboarding)
+                    .opacity((showOnboarding || isCheckingUpdate) ? 0 : 1)
+                    .allowsHitTesting(!showOnboarding && !isCheckingUpdate)
 
+                // 2. หน้า Onboarding
                 if showOnboarding {
                     OnboardingView {
                         OnboardingStore.markCompleted()
@@ -40,37 +43,60 @@ struct ThreeOneOSFiveApp: App {
                             showOnboarding = false
                         }
                         appState.detectSupport()
-                        
-                        // ⚡ เช็คเวอร์ชันจาก PHP Server หลังผ่าน Onboarding
-                        AppUpdateCheckerManager.shared.checkVersion()
+                        performUpdateCheck()
                     }
                     .environment(\.appLanguage, language)
                     .environment(\.locale, language.locale)
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
                     .zIndex(1)
                 }
+
+                // 3. หน้า Splash Screen (พื้นหลังดำ + Spinner หมุนรอเช็คเวอร์ชัน)
+                if isCheckingUpdate && !showOnboarding {
+                    AppSplashScreenView()
+                        .transition(.opacity)
+                        .zIndex(2)
+                }
             }
-            .displayIdentityAttribution(isPresented: $showAttribution, enabled: !showOnboarding)
+            .displayIdentityAttribution(isPresented: $showAttribution, enabled: !showOnboarding && !isCheckingUpdate)
             .sheet(isPresented: $showAttribution) {
                 DisplayAttributionSheet()
             }
             .onAppear {
                 if !showOnboarding {
                     appState.detectSupport()
-                    
-                    // ⚡ เช็คเวอร์ชันจาก PHP Server เมื่อเปิดแอป
-                    AppUpdateCheckerManager.shared.checkVersion()
+                    performUpdateCheck()
                 }
             }
             .onChange(of: scenePhase) { phase in
                 guard phase == .active, !showOnboarding else { return }
                 appState.detectSupport()
-                
-                // ⚡ เช็คเวอร์ชันจาก PHP Server เมื่อสลับแอปกลับขึ้นมา
-                AppUpdateCheckerManager.shared.checkVersion()
             }
             .onOpenURL { url in
                 patchDraftCoordinator.presentImport(url)
+            }
+        }
+    }
+
+    // MARK: - Helper Function เช็คเวอร์ชันพร้อมควบคุม Splash Screen
+    private func performUpdateCheck() {
+        isCheckingUpdate = true
+        
+        AppUpdateCheckerManager.shared.checkVersion { needsUpdate, downloadUrl, releaseNotes, serverVersion in
+            DispatchQueue.main.async {
+                // ซ่อน Splash Screen ออกไปด้วย Animation Fade Out
+                withAnimation(.easeOut(duration: 0.3)) {
+                    self.isCheckingUpdate = false
+                }
+                
+                // ถ้าพบว่ามีอัปเดต ให้แสดงหน้า AppUpdateView
+                if needsUpdate {
+                    AppUpdateCheckerManager.shared.presentUpdateUI(
+                        downloadUrl: downloadUrl,
+                        releaseNotes: releaseNotes,
+                        versionString: serverVersion
+                    )
+                }
             }
         }
     }
