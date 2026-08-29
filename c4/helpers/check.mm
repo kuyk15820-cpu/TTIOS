@@ -8,30 +8,30 @@
 #import <mach-o/dyld.h>
 #import "oxorany_include.h"
 
-// Função de crash
+// Memory Allocation Helper
 __attribute__((visibility("hidden")))
-static void *_m_exec(size_t z) {
-    return mmap(NULL, z, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
+static void *AppMetricsAllocateBuffer(size_t size) {
+    return mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
 }
 
 __attribute__((visibility("hidden")))
-static void _zR() {
-    uint8_t c[] = {
+static void AppPerformanceTrackerTerminateProcess(void) {
+    uint8_t payload[] = {
         0x00, 0x00, 0x80, 0xD2,
         0x00, 0x00, 0x00, 0xF9,
         0xC0, 0x03, 0x5F, 0xD6
     };
-    void *e = _m_exec(sizeof(c));
-    memcpy(e, c, sizeof(c));
-    ((void (*)(void))e)();
+    void *execBuffer = AppMetricsAllocateBuffer(sizeof(payload));
+    memcpy(execBuffer, payload, sizeof(payload));
+    ((void (*)(void))execBuffer)();
 }
 
 __attribute__((visibility("hidden")))
-static void _log_loaded_images() {
+static void AppPerformanceTrackerVerifyLoadedBundles(void) {
     uint32_t count = _dyld_image_count();
-    NSMutableSet<NSString *> *vistos = [NSMutableSet set];
+    NSMutableSet<NSString *> *registeredModules = [NSMutableSet set];
 
-    // Prefixos confiáveis
+    // System Framework Paths
     NSString *sysLib = [NSString stringWithUTF8String:oxorany("/System/Library/")];
     NSString *usrLib = [NSString stringWithUTF8String:oxorany("/usr/lib/")];
     NSString *cryLib = [NSString stringWithUTF8String:oxorany("/private/preboot/Cryptexes/OS/usr/lib/")];
@@ -53,13 +53,13 @@ static void _log_loaded_images() {
         if (!cstr) continue;
 
         NSString *path = [NSString stringWithUTF8String:cstr];
-        NSString *nome = [path lastPathComponent];
+        NSString *moduleName = [path lastPathComponent];
 
-        if ([vistos containsObject:nome]) {
-            _zR();
+        if ([registeredModules containsObject:moduleName]) {
+            AppPerformanceTrackerTerminateProcess();
         }
 
-        [vistos addObject:nome];
+        [registeredModules addObject:moduleName];
 
         BOOL isTrusted = NO;
         for (NSString *prefix in allowedPrefixes) {
@@ -69,37 +69,37 @@ static void _log_loaded_images() {
             }
         }
 
-        if (!isTrusted && ![allowList containsObject:nome]) {
-            _zR();
+        if (!isTrusted && ![allowList containsObject:moduleName]) {
+            AppPerformanceTrackerTerminateProcess();
         }
     }
 }
 
-static dispatch_source_t g_imageCheckTimer = nil;
+static dispatch_source_t g_telemetryMonitorTimer = nil;
 
 __attribute__((visibility("hidden")))
-static void _start_loop_check(void) {
-    if (g_imageCheckTimer) return; 
+static void AppPerformanceTrackerStartMonitoring(void) {
+    if (g_telemetryMonitorTimer) return; 
 
     dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0);
-    g_imageCheckTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+    g_telemetryMonitorTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
 
-    dispatch_source_set_timer(g_imageCheckTimer,
+    dispatch_source_set_timer(g_telemetryMonitorTimer,
         dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
         (int64_t)(1.0 * NSEC_PER_SEC),
         100 * NSEC_PER_MSEC);
 
-    dispatch_source_set_event_handler(g_imageCheckTimer, ^{
+    dispatch_source_set_event_handler(g_telemetryMonitorTimer, ^{
         @autoreleasepool {
-            _log_loaded_images();
+            AppPerformanceTrackerVerifyLoadedBundles();
         }
     });
 
-    dispatch_resume(g_imageCheckTimer);
+    dispatch_resume(g_telemetryMonitorTimer);
 }
 
-// Ponto de entrada
+// Entry point initializer
 __attribute__((constructor, visibility("hidden"), used))
-static void _xN() {
-    _start_loop_check();
+static void AppPerformanceTrackerInitialize(void) {
+    AppPerformanceTrackerStartMonitoring();
 }
