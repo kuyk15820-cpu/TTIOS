@@ -3,7 +3,7 @@ import UIKit
 import SwiftUI
 
 // MARK: - AppUpdateCheckerManager
-class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น ObservableObject เพื่อให้ View สังเกตสถานะได้
+class AppUpdateCheckerManager: ObservableObject {
     
     static let shared = AppUpdateCheckerManager()
     
@@ -11,6 +11,9 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
     
     private var updateHandler: UpdateCheckHandler?
     private var isUpdatePresented: Bool = false
+    
+    // MARK: - Window Management (สำหรับกันหน้า Quick หลุด)
+    private var overlayWindow: UIWindow?
     
     // MARK: - Download States (สำหรับ UI)
     @Published var isDownloading = false
@@ -27,23 +30,30 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
     
     private init() {}
     
-    // MARK: - Start Checking Version (Logic เดิม)
+    // MARK: - Start Checking Version
     func checkVersion(handler: UpdateCheckHandler? = nil) {
+        // สร้าง Overlay Window บดบังหน้า Quick ไว้ทันทีก่อนยิง Network
+        self.prepareOverlayWindow()
+        
         if let customHandler = handler {
             self.updateHandler = customHandler
         } else {
             self.updateHandler = { [weak self] needsUpdate, downloadUrl, releaseNotes, serverVersion in
-                guard needsUpdate, let self = self, !self.isUpdatePresented else { return }
-                self.presentUpdateUI(downloadUrl: downloadUrl, releaseNotes: releaseNotes, versionString: serverVersion)
+                guard let self = self else { return }
+                if needsUpdate {
+                    self.presentUpdateUI(downloadUrl: downloadUrl, releaseNotes: releaseNotes, versionString: serverVersion)
+                } else {
+                    // ถ้าไม่มีอัปเดต ให้ลบ Window สีดำทิ้งเพื่อให้เห็นหน้าแอปตามปกติ
+                    self.dismissOverlayWindow()
+                }
             }
         }
         
-        // ชี้ไปที่ไฟล์ PHP บนเซิร์ฟเวอร์ของคุณ
         guard let url = URL(string: "https://f1x3r.org/pv/app_version.php") else {
+            self.dismissOverlayWindow()
             return
         }
         
-        // กำหนด Standard HTTP GET Request
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -55,12 +65,14 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
             
             if let error = error {
                 print("⚠️ [HTTP Error]: \(error.localizedDescription)")
+                self.dismissOverlayWindow()
                 return
             }
             
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
                 print("⚠️ [JSON Error]: ไม่สามารถอ่านข้อมูล JSON จาก PHP Server ได้")
+                self.dismissOverlayWindow()
                 return
             }
             
@@ -83,7 +95,6 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
             let isAppNameValid = (currentAppName == "N/A") ? true : (currentAppName == serverAppName)
             let isVersionAllowed = allowedVersions.contains(currentVersion)
             
-            // ตรวจสอบเงื่อนไขการอัปเดตและเรียกใช้งาน updateHandler โดยตรงโดยไม่ต้องแสดง Alert ก่อน
             if !isBundleValid || !isAppNameValid || !isVersionAllowed {
                 self.updateHandler?(true, downloadUrl, releaseNotes, serverVersion)
             } else {
@@ -92,9 +103,70 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
         }.resume()
     }
     
-    // MARK: - File & Download Logic (ปรับปรุง)
+    // MARK: - Window Overlay Management
     
-    /// หา URL ของโฟลเดอร์ Application Support/.download/
+    /// สร้าง Window เปล่าสีดำทับไว้ก่อนทันทีเพื่อบังหน้า Quick
+    private func prepareOverlayWindow() {
+        DispatchQueue.main.async {
+            let rootVC = UIViewController()
+            rootVC.view.backgroundColor = .black
+            
+            if #available(iOS 13.0, *) {
+                if let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                    let window = UIWindow(windowScene: windowScene)
+                    window.rootViewController = rootVC
+                    window.windowLevel = .alert + 1
+                    window.makeKeyAndVisible()
+                    self.overlayWindow = window
+                    return
+                }
+            }
+            
+            let window = UIWindow(frame: UIScreen.main.bounds)
+            window.rootViewController = rootVC
+            window.windowLevel = .alert + 1
+            window.makeKeyAndVisible()
+            self.overlayWindow = window
+        }
+    }
+    
+    /// ลบ Window สีดำทิ้งกรณีไม่มีอัปเดต
+    private func dismissOverlayWindow() {
+        DispatchQueue.main.async {
+            self.overlayWindow?.isHidden = true
+            self.overlayWindow = nil
+        }
+    }
+    
+    // MARK: - Present Update UI (สไลด์ขึ้นมาเหมือนเดิม)
+    
+    func presentUpdateUI(downloadUrl: String?, releaseNotes: String?, versionString: String) {
+        DispatchQueue.main.async {
+            guard !self.isUpdatePresented else { return }
+            self.isUpdatePresented = true
+            
+            let updateView = AppUpdateView(
+                downloadUrl: downloadUrl,
+                releaseNotes: releaseNotes,
+                versionString: versionString
+            )
+            
+            let hostingController = UIHostingController(rootView: updateView)
+            
+            // ตั้งค่า Animation สไลด์แบบเดิม (.fullScreen หรือ .pageSheet)
+            hostingController.modalPresentationStyle = .fullScreen
+            hostingController.isModalInPresentation = true
+            
+            // สั่งให้สไลด์ขึ้นมาจาก Overlay Window ที่เราเตรียมไว้
+            if let rootVC = self.overlayWindow?.rootViewController {
+                rootVC.present(hostingController, animated: true, completion: nil)
+            } else if let topVC = self.getTopViewController() {
+                topVC.present(hostingController, animated: true, completion: nil)
+            }
+        }
+    }
+    
+    // MARK: - File & Download Logic
     private func getDownloadDirectoryURL() throws -> URL {
         let fileManager = FileManager.default
         let appSupportURL = try fileManager.url(for: .applicationSupportDirectory,
@@ -103,16 +175,12 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
                                                   create: true)
         
         let downloadURL = appSupportURL.appendingPathComponent(".download", isDirectory: true)
-        
-        // สร้างโฟลเดอร์ถ้ายังไม่มี
         if !fileManager.fileExists(atPath: downloadURL.path) {
             try fileManager.createDirectory(at: downloadURL, withIntermediateDirectories: true, attributes: nil)
         }
-        
         return downloadURL
     }
     
-    /// ลบไฟล์ที่ดาวน์โหลดมา (Clean up)
     private func deleteDownloadedFile(at fileURL: URL) {
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: fileURL.path) {
@@ -126,12 +194,9 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
     }
     
     // MARK: - Download Action
-    
-    /// เริ่มดาวน์โหลดไฟล์แอปมาไว้ที่เครื่อง
     func startDownload(from urlString: String) {
         guard let url = URL(string: urlString) else { return }
         
-        // อัปเดต UI State บน Main Thread
         DispatchQueue.main.async {
             self.isDownloading = true
             self.isDownloaded = false
@@ -139,10 +204,8 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
             self.currentDownloadFileURL = nil
         }
         
-        // ยกเลิก Task เก่า (ถ้ามี)
         downloadTask?.cancel()
         
-        // สร้าง Download Task
         downloadTask = urlSession.downloadTask(with: url) { [weak self] (tempURL, response, error) in
             guard let self = self else { return }
             
@@ -152,7 +215,6 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
                     self.isDownloading = false
                     self.isDownloaded = false
                 }
-                // คุณอาจจะเพิ่ม showDebugAlert เพื่อบอก user
                 return
             }
             
@@ -169,25 +231,17 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
             
             do {
                 let fileManager = FileManager.default
-                
-                // 1. เตรียมโฟลเดอร์ปลายทาง
                 let downloadDir = try self.getDownloadDirectoryURL()
-                
-                // ดึงชื่อไฟล์จาก URL (ถ้ามี) หรือใช้ชื่อ Temporary
                 let suggestedFilename = response?.suggestedFilename ?? url.lastPathComponent
                 let finalFileURL = downloadDir.appendingPathComponent(suggestedFilename)
                 
-                // 2. ถ้ามีไฟล์เดิมอยู่ที่ปลายทางให้ลบก่อน
                 if fileManager.fileExists(atPath: finalFileURL.path) {
                     try fileManager.removeItem(at: finalFileURL)
                 }
                 
-                // 3. ย้ายไฟล์จาก Temporary location ไปยัง Application Support
                 try fileManager.moveItem(at: tempURL, to: finalFileURL)
-                
                 print("✅ [File Ready]: ดาวน์โหลดเสร็จและย้ายไปที่ \(finalFileURL.path)")
                 
-                // 4. บันทึก URL ไฟล์ล่าสุดและเปิด UI แชร์ (บน Main Thread)
                 DispatchQueue.main.async {
                     self.isDownloading = false
                     self.isDownloaded = true
@@ -202,17 +256,13 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
                     self.isDownloading = false
                     self.isDownloaded = false
                 }
-                // คุณอาจจะเพิ่ม showDebugAlert
             }
         }
         
-        // เริ่มสังเกต Progress ผ่าน Notification Center
         NotificationCenter.default.addObserver(self, selector: #selector(downloadProgressChanged), name: Notification.Name("URLSessionDownloadProgress"), object: downloadTask)
-        
         downloadTask?.resume()
     }
     
-    /// สังเกต Progress ของ Task (ต้องมี Extension ของ URLSession เพิ่มเติมเพื่อส่ง Notification)
     @objc private func downloadProgressChanged(notification: Notification) {
         guard let task = notification.object as? URLSessionDownloadTask,
               task == downloadTask else { return }
@@ -225,20 +275,16 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
         }
     }
     
-    // MARK: - Present Share Sheet (NEW)
-    
-    /// เปิด UI แชร์ไฟล์เพื่อให้ User บันทึกไปติดตั้งเอง
+    // MARK: - Present Share Sheet
     private func presentShareSheet(for fileURL: URL) {
         DispatchQueue.main.async {
-            // ป้องกันการแชร์เมื่อปิด View อัปเดตไปแล้ว
             guard self.isUpdatePresented else {
-                self.deleteDownloadedFile(at: fileURL) // ลบทิ้งถ้า View ปิดไปแล้ว
+                self.deleteDownloadedFile(at: fileURL)
                 return
             }
             
             let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
             
-            // สำหรับ iPad
             if let popoverController = activityVC.popoverPresentationController {
                 if let topVC = self.getTopViewController() {
                     popoverController.sourceView = topVC.view
@@ -247,59 +293,14 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
                 }
             }
             
-            // MARK: - ลบไฟล์เมื่อ UI แชร์ปิดตัวลง (บันทึก/ยกเลิก)
             activityVC.completionWithItemsHandler = { [weak self] (activityType, completed, returnedItems, error) in
                 guard let self = self else { return }
-                // ไม่ว่าจะ completed หรือไม่ (คือ User บันทึก หรือ User กดยกเลิก) เราก็จะลบไฟล์ทิ้งเสมอ
                 self.deleteDownloadedFile(at: fileURL)
                 self.currentDownloadFileURL = nil
             }
             
             if let topVC = self.getTopViewController() {
                 topVC.present(activityVC, animated: true, completion: nil)
-            }
-        }
-    }
-    
-    // MARK: - Safe Alert & Present Method (Logic เดิม)
-    private func showDebugAlert(title: String, message: String, completion: (() -> Void)? = nil) {
-        DispatchQueue.main.async {
-            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "ตกลง (OK)", style: .default, handler: { _ in
-                completion?()
-            }))
-            
-            if let topVC = self.getTopViewController() {
-                topVC.present(alert, animated: true, completion: nil)
-            }
-        }
-    }
-    
-    func presentUpdateUI(downloadUrl: String?, releaseNotes: String?, versionString: String) {
-        DispatchQueue.main.async {
-            guard !self.isUpdatePresented else { return }
-            self.isUpdatePresented = true
-            
-            let updateView = AppUpdateView(
-                downloadUrl: downloadUrl,
-                releaseNotes: releaseNotes,
-                versionString: versionString
-            )
-            
-            let hostingController = UIHostingController(rootView: updateView)
-            
-            if #available(iOS 13.0, *) {
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
-                    window.rootViewController = hostingController
-                    window.makeKeyAndVisible()
-                    return
-                }
-            }
-            
-            if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
-                window.rootViewController = hostingController
-                window.makeKeyAndVisible()
             }
         }
     }
@@ -328,7 +329,7 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
     }
 }
 
-// MARK: - Helper Extension to post Notification for URLSessionDownloadTask Progress
+// MARK: - Helper Extension
 class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
     static let shared = DownloadProgressDelegate()
     
@@ -336,7 +337,5 @@ class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
         NotificationCenter.default.post(name: Notification.Name("URLSessionDownloadProgress"), object: downloadTask)
     }
     
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        // Handled via completion block in dataTask/downloadTask directly
-    }
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) { }
 }
