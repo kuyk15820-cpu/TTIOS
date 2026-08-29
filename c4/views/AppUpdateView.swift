@@ -85,8 +85,8 @@ struct AppUpdateView: View {
                             if updateManager.isDownloading {
                                 ActivityIndicator(isAnimating: true, style: .medium)
                                 
-                                // แสดงผล Downloading... พร้อมขนาด MB/MB
-                                Text(updateManager.downloadSizeText.isEmpty ? "Downloading..." : "Downloading... (\(updateManager.downloadSizeText))")
+                                // แสดงผล Downloading... (XX%) จาก Manager
+                                Text(updateManager.downloadSizeText.isEmpty ? "Downloading..." : updateManager.downloadSizeText)
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.white)
                                     .lineLimit(1)
