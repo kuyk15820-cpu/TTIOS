@@ -10,7 +10,7 @@ struct ThreeOneOSFiveApp: App {
     
     @State private var showOnboarding = false 
     @State private var showAttribution = false
-    @State private var isCheckingUpdate = true // State สำหรับคุมการแสดง Splash Screen
+    @State private var isCheckingUpdate = true // เริ่มต้นเป็น true เพื่อแสดง Splash Screen
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -55,7 +55,7 @@ struct ThreeOneOSFiveApp: App {
                 if isCheckingUpdate && !showOnboarding {
                     AppSplashScreenView()
                         .transition(.opacity)
-                        .zIndex(2)
+                        .zIndex(999) // กำหนด zIndex ชั้นสูงสุด
                 }
             }
             .displayIdentityAttribution(isPresented: $showAttribution, enabled: !showOnboarding && !isCheckingUpdate)
@@ -78,29 +78,25 @@ struct ThreeOneOSFiveApp: App {
         }
     }
 
-        // MARK: - Helper Function เช็คเวอร์ชันพร้อมหน่วงเวลา Splash Screen 1 วินาที
+    // MARK: - Helper Function เช็คเวอร์ชันพร้อมหน่วงเวลา Splash Screen ขั้นต่ำ 1 วินาที
     private func performUpdateCheck() {
         isCheckingUpdate = true
-        let startTime = Date() // บันทึกเวลาเริ่มต้น
+        let startTime = Date()
         
         AppUpdateCheckerManager.shared.checkVersion { needsUpdate, downloadUrl, releaseNotes, serverVersion in
             Task { @MainActor in
-                // คำนวณเวลาที่ใช้ไป
                 let elapsedTime = Date().timeIntervalSince(startTime)
-                let minDuration: TimeInterval = 1.0 // กำหนดเวลาขั้นต่ำ 1 วินาที
+                let minDuration: TimeInterval = 1.0 // หน่วงขั้นต่ำ 1 วินาที
                 
-                // ถ้าเช็คเสร็จเร็วกว่า 1 วินาที ให้สั่ง sleep รอจนครบเวลา
                 if elapsedTime < minDuration {
                     let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
                     try? await Task.sleep(nanoseconds: remainingTime)
                 }
                 
-                // ปิด Splash Screen ด้วย Animation Fade Out
                 withAnimation(.easeOut(duration: 0.3)) {
                     self.isCheckingUpdate = false
                 }
                 
-                // แสดงหน้า Update UI ถ้ามีเวอร์ชันใหม่
                 if needsUpdate {
                     AppUpdateCheckerManager.shared.presentUpdateUI(
                         downloadUrl: downloadUrl,
@@ -111,6 +107,7 @@ struct ThreeOneOSFiveApp: App {
             }
         }
     }
+}
 
 // MARK: - AppState
 class AppState: ObservableObject {
