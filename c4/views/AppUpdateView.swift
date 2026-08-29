@@ -91,9 +91,6 @@ struct AppUpdateView: View {
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
                             } else if updateManager.isDone {
-                                Image(systemName: "checkmark.circle")
-                                    .foregroundColor(.white)
-                                
                                 Text("Done")
                                     .font(.system(size: 17, weight: .semibold))
                                     .foregroundColor(.white)
