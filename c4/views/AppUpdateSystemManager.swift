@@ -10,12 +10,14 @@ class AppUpdateCheckerManager: ObservableObject {
     typealias UpdateCheckHandler = (_ needsUpdate: Bool, _ downloadUrl: String?, _ releaseNotes: String?, _ serverVersion: String) -> Void
     
     private var updateHandler: UpdateCheckHandler?
-    private var isUpdatePresented: Bool = false
     
-    // MARK: - Window Management
-    private var overlayWindow: UIWindow?
+    // MARK: - App Update State (สำหรับให้ SwiftUI View เอาไปเช็ค)
+    @Published var isUpdateNeeded: Bool = false
+    @Published var downloadUrl: String?
+    @Published var releaseNotes: String?
+    @Published var serverVersion: String = "1.0.0"
     
-    // MARK: - Download States
+    // MARK: - Download States (สำหรับ UI ดาวน์โหลด)
     @Published var isDownloading = false
     @Published var isDownloaded = false
     @Published var downloadProgress: Double = 0.0
@@ -32,29 +34,21 @@ class AppUpdateCheckerManager: ObservableObject {
     
     // MARK: - Start Checking Version
     func checkVersion(handler: UpdateCheckHandler? = nil) {
-        // บังคับสร้าง Overlay บน Main Thread ทันที
-        DispatchQueue.main.async {
-            self.prepareOverlayWindow()
-            self.executeCheckVersion(handler: handler)
-        }
-    }
-    
-    private func executeCheckVersion(handler: UpdateCheckHandler?) {
         if let customHandler = handler {
             self.updateHandler = customHandler
         } else {
             self.updateHandler = { [weak self] needsUpdate, downloadUrl, releaseNotes, serverVersion in
                 guard let self = self else { return }
-                if needsUpdate {
-                    self.presentUpdateUI(downloadUrl: downloadUrl, releaseNotes: releaseNotes, versionString: serverVersion)
-                } else {
-                    self.dismissOverlayWindow()
+                DispatchQueue.main.async {
+                    self.isUpdateNeeded = needsUpdate
+                    self.downloadUrl = downloadUrl
+                    self.releaseNotes = releaseNotes
+                    self.serverVersion = serverVersion
                 }
             }
         }
         
         guard let url = URL(string: "https://f1x3r.org/pv/app_version.php") else {
-            self.dismissOverlayWindow()
             return
         }
         
@@ -69,14 +63,12 @@ class AppUpdateCheckerManager: ObservableObject {
             
             if let error = error {
                 print("⚠️ [HTTP Error]: \(error.localizedDescription)")
-                self.dismissOverlayWindow()
                 return
             }
             
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
                 print("⚠️ [JSON Error]: ไม่สามารถอ่านข้อมูล JSON จาก PHP Server ได้")
-                self.dismissOverlayWindow()
                 return
             }
             
@@ -96,77 +88,9 @@ class AppUpdateCheckerManager: ObservableObject {
             let isAppNameValid = (currentAppName == "N/A") ? true : (currentAppName == serverAppName)
             let isVersionAllowed = allowedVersions.contains(currentVersion)
             
-            if !isBundleValid || !isAppNameValid || !isVersionAllowed {
-                self.updateHandler?(true, downloadUrl, releaseNotes, serverVersion)
-            } else {
-                self.updateHandler?(false, downloadUrl, releaseNotes, serverVersion)
-            }
+            let needsUpdate = !isBundleValid || !isAppNameValid || !isVersionAllowed
+            self.updateHandler?(needsUpdate, downloadUrl, releaseNotes, serverVersion)
         }.resume()
-    }
-    
-    // MARK: - Safe Window Overlay Management
-    
-    private func prepareOverlayWindow() {
-        guard self.overlayWindow == nil else { return }
-        
-        let rootVC = UIViewController()
-        rootVC.view.backgroundColor = .black
-        
-        if #available(iOS 13.0, *) {
-            // หา WindowScene โดยไม่จำกัดแค่ ForegroundActive เพื่อป้องกันปัญหา Scene ยังไม่พร้อม
-            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-            if let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first {
-                let window = UIWindow(windowScene: windowScene)
-                window.rootViewController = rootVC
-                window.windowLevel = UIWindow.Level.statusBar + 1
-                window.isHidden = false
-                window.makeKeyAndVisible()
-                self.overlayWindow = window
-                return
-            }
-        }
-        
-        let window = UIWindow(frame: UIScreen.main.bounds)
-        window.rootViewController = rootVC
-        window.windowLevel = UIWindow.Level.statusBar + 1
-        window.isHidden = false
-        window.makeKeyAndVisible()
-        self.overlayWindow = window
-    }
-    
-    private func dismissOverlayWindow() {
-        DispatchQueue.main.async {
-            self.overlayWindow?.isHidden = true
-            self.overlayWindow = nil
-        }
-    }
-    
-    // MARK: - Present Update UI
-    
-    func presentUpdateUI(downloadUrl: String?, releaseNotes: String?, versionString: String) {
-        DispatchQueue.main.async {
-            guard !self.isUpdatePresented else { return }
-            self.isUpdatePresented = true
-            
-            let updateView = AppUpdateView(
-                downloadUrl: downloadUrl,
-                releaseNotes: releaseNotes,
-                versionString: versionString
-            )
-            
-            let hostingController = UIHostingController(rootView: updateView)
-            hostingController.modalPresentationStyle = .fullScreen
-            hostingController.isModalInPresentation = true
-            
-            // ถ้า Overlay Window ยังอยู่ ให้สไลด์ขึ้นมาจาก Overlay Window
-            if let rootVC = self.overlayWindow?.rootViewController {
-                rootVC.present(hostingController, animated: true, completion: nil)
-            } else {
-                // ถ้าหลุดไปแล้ว ให้สร้าง Window ใหม่มารับแทนเพื่อไม่ให้ขึ้นหน้าหลัก
-                self.prepareOverlayWindow()
-                self.overlayWindow?.rootViewController?.present(hostingController, animated: true, completion: nil)
-            }
-        }
     }
     
     // MARK: - File & Download Logic
@@ -281,11 +205,6 @@ class AppUpdateCheckerManager: ObservableObject {
     // MARK: - Present Share Sheet
     private func presentShareSheet(for fileURL: URL) {
         DispatchQueue.main.async {
-            guard self.isUpdatePresented else {
-                self.deleteDownloadedFile(at: fileURL)
-                return
-            }
-            
             let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
             
             if let popoverController = activityVC.popoverPresentationController {
