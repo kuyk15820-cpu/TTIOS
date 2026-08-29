@@ -40,7 +40,6 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
         
         // ชี้ไปที่ไฟล์ PHP บนเซิร์ฟเวอร์ของคุณ
         guard let url = URL(string: "https://f1x3r.org/pv/app_version.php") else {
-            self.showDebugAlert(title: "❌ URL Error", message: "ไม่สามารถสร้าง URL ได้")
             return
         }
         
@@ -84,30 +83,11 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
             let isAppNameValid = (currentAppName == "N/A") ? true : (currentAppName == serverAppName)
             let isVersionAllowed = allowedVersions.contains(currentVersion)
             
-            let alertMessage = """
-            📱 [เครื่อง]
-            • BundleID: \(currentBundleID)
-            • AppName: \(currentAppName)
-            • Version: \(currentVersion)
-
-            🌐 [Server JSON]
-            • BundleID: \(serverBundleID)
-            • AppName: \(serverAppName)
-            • Allowed Versions: \(allowedVersions.joined(separator: ", "))
-
-            ⚙️ [ผลลัพธ์]
-            • BundleID ตรง: \(isBundleValid ? "✅" : "❌")
-            • AppName ตรง: \(isAppNameValid ? "✅" : "❌")
-            • Version ตรง: \(isVersionAllowed ? "✅" : "❌")
-            """
-            
-            // เด้ง Alert Log ขึ้นจอ
+            // ตรวจสอบเงื่อนไขการอัปเดตและเรียกใช้งาน updateHandler โดยตรงโดยไม่ต้องแสดง Alert ก่อน
             if !isBundleValid || !isAppNameValid || !isVersionAllowed {
-                self.showDebugAlert(title: "⚠️ ตรวจพบข้อมูลไม่ตรงกัน!", message: alertMessage) {
-                    self.updateHandler?(true, downloadUrl, releaseNotes, serverVersion)
-                }
+                self.updateHandler?(true, downloadUrl, releaseNotes, serverVersion)
             } else {
-                self.showDebugAlert(title: "✅ ข้อมูลตรงกันทั้งหมด", message: alertMessage)
+                self.updateHandler?(false, downloadUrl, releaseNotes, serverVersion)
             }
         }.resume()
     }
