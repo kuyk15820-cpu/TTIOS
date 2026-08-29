@@ -20,6 +20,7 @@ class AppUpdateCheckerManager: ObservableObject {
     // MARK: - Download States
     @Published var isDownloading = false
     @Published var isDownloaded = false
+    @Published var isDone = false // 💡 State สำหรับควบคุมปุ่ม Done
     @Published var downloadProgress: Double = 0.0
     @Published var currentDownloadFileURL: URL?
     
@@ -126,6 +127,7 @@ class AppUpdateCheckerManager: ObservableObject {
         DispatchQueue.main.async {
             self.isDownloading = true
             self.isDownloaded = false
+            self.isDone = false
             self.downloadProgress = 0.0
             self.totalBytesWritten = 0
             self.totalBytesExpected = 0
@@ -171,16 +173,14 @@ class AppUpdateCheckerManager: ObservableObject {
     func handleDownloadCompletion(tempURL: URL, response: URLResponse?, error: Error?) {
         if error != nil {
             DispatchQueue.main.async {
-                self.isDownloading = false
-                self.isDownloaded = false
+                self.resetStates()
             }
             return
         }
         
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
             DispatchQueue.main.async {
-                self.isDownloading = false
-                self.isDownloaded = false
+                self.resetStates()
             }
             return
         }
@@ -197,19 +197,32 @@ class AppUpdateCheckerManager: ObservableObject {
             
             try fileManager.moveItem(at: tempURL, to: finalFileURL)
             
+            // 💡 1. ค้าง 100% ให้ผู้ใช้เห็นก่อน 0.5 วินาที
             DispatchQueue.main.async {
-                self.isDownloading = false
-                self.isDownloaded = true
                 self.downloadProgress = 1.0
+                self.downloadSizeText = "Downloading... (100%)"
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // 💡 2. สลับเป็น Done และเปิด Share Sheet
+                self.isDownloading = false
+                self.isDone = true
                 self.currentDownloadFileURL = finalFileURL
                 self.presentShareSheet(for: finalFileURL)
             }
         } catch {
             DispatchQueue.main.async {
-                self.isDownloading = false
-                self.isDownloaded = false
+                self.resetStates()
             }
         }
+    }
+    
+    private func resetStates() {
+        self.isDownloading = false
+        self.isDownloaded = false
+        self.isDone = false
+        self.downloadProgress = 0.0
+        self.downloadSizeText = ""
     }
     
     // MARK: - Present Share Sheet
@@ -229,6 +242,11 @@ class AppUpdateCheckerManager: ObservableObject {
                 guard let self = self else { return }
                 self.deleteDownloadedFile(at: fileURL)
                 self.currentDownloadFileURL = nil
+                
+                // 💡 เมื่อแชร์เสร็จ หรือปิดหน้า Share Sheet ให้รีเซ็ตสถานะกลับเป็น Update now
+                DispatchQueue.main.async {
+                    self.resetStates()
+                }
             }
             
             if let topVC = self.getTopViewController() {
