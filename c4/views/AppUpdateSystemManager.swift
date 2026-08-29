@@ -282,7 +282,7 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
         }
     }
     
-    private func presentUpdateUI(downloadUrl: String?, releaseNotes: String?, versionString: String) {
+    func presentUpdateUI(downloadUrl: String?, releaseNotes: String?, versionString: String) {
         DispatchQueue.main.async {
             guard !self.isUpdatePresented else { return }
             self.isUpdatePresented = true
