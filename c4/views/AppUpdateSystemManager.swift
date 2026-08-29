@@ -14,6 +14,7 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
     
     // MARK: - Download States (สำหรับ UI)
     @Published var isDownloading = false
+    @Published var isDownloaded = false
     @Published var downloadProgress: Double = 0.0
     @Published var currentDownloadFileURL: URL?
     
@@ -21,8 +22,7 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
     private var downloadTask: URLSessionDownloadTask?
     private lazy var urlSession: URLSession = {
         let config = URLSessionConfiguration.default
-        // ไม่ใช้ Delegate ตรงนี้เพราะเราจะสังเกตผ่าน Notification
-        return URLSession(configuration: config)
+        return URLSession(configuration: config, delegate: DownloadProgressDelegate.shared, delegateQueue: nil)
     }()
     
     private init() {}
@@ -134,6 +134,7 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
         // อัปเดต UI State บน Main Thread
         DispatchQueue.main.async {
             self.isDownloading = true
+            self.isDownloaded = false
             self.downloadProgress = 0.0
             self.currentDownloadFileURL = nil
         }
@@ -142,14 +143,15 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
         downloadTask?.cancel()
         
         // สร้าง Download Task
-        downloadTask = URLSession.shared.downloadTask(with: url) { [weak self] (tempURL, response, error) in
+        downloadTask = urlSession.downloadTask(with: url) { [weak self] (tempURL, response, error) in
             guard let self = self else { return }
-            
-            // ปิดสถานะกำลังโหลด (บน Main Thread เสมอ)
-            DispatchQueue.main.async { self.isDownloading = false }
             
             if let error = error {
                 print("❌ [Download Error]: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.isDownloading = false
+                    self.isDownloaded = false
+                }
                 // คุณอาจจะเพิ่ม showDebugAlert เพื่อบอก user
                 return
             }
@@ -158,6 +160,10 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
                   let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
                 print("❌ [Download Response Error]: Invalid server response")
+                DispatchQueue.main.async {
+                    self.isDownloading = false
+                    self.isDownloaded = false
+                }
                 return
             }
             
@@ -183,12 +189,19 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
                 
                 // 4. บันทึก URL ไฟล์ล่าสุดและเปิด UI แชร์ (บน Main Thread)
                 DispatchQueue.main.async {
+                    self.isDownloading = false
+                    self.isDownloaded = true
+                    self.downloadProgress = 1.0
                     self.currentDownloadFileURL = finalFileURL
                     self.presentShareSheet(for: finalFileURL)
                 }
                 
             } catch {
                 print("❌ [File Operation Error]: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.isDownloading = false
+                    self.isDownloaded = false
+                }
                 // คุณอาจจะเพิ่ม showDebugAlert
             }
         }
@@ -277,8 +290,24 @@ class AppUpdateCheckerManager: ObservableObject { // ปรับเป็น Ob
             hostingController.modalPresentationStyle = .fullScreen
             hostingController.isModalInPresentation = true
             
+            if #available(iOS 13.0, *) {
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
+                    let containerVC = UIViewController()
+                    containerVC.view.backgroundColor = .black
+                    hostingController.view.frame = containerVC.view.bounds
+                    hostingController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                    containerVC.addChild(hostingController)
+                    containerVC.view.addSubview(hostingController.view)
+                    hostingController.didMove(toParent: containerVC)
+                    
+                    window.rootViewController?.present(hostingController, animated: false, completion: nil)
+                    return
+                }
+            }
+            
             if let topVC = self.getTopViewController() {
-                topVC.present(hostingController, animated: true, completion: nil)
+                topVC.present(hostingController, animated: false, completion: nil)
             }
         }
     }
