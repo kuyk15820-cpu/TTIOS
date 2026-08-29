@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import SwiftDate
 
 // MARK: - Native List Row Button Style ( Highlighting Effect )
 
@@ -17,11 +18,17 @@ struct NativeListRowButtonStyle: ButtonStyle {
 
 extension String {
     var toRelativeTimeText: String {
-        guard let date = try? Date(self, strategy: .iso8601) else {
+        // SwiftDate จะช่วย Parse ISO8601 string อัตโนมัติ (รองรับหลายรูปแบบ/มีทศนิยม)
+        guard let date = self.toDate()?.date else {
             return self
         }
         let safeDate = min(date, Date())
-        return safeDate.formatted(.relative(presentation: .named).locale(Locale(identifier: "th_TH")))
+        
+        // แปลงเป็นข้อความ Relative Time ภาษาไทย
+        return safeDate.toRelative(
+            style: RelativeFormatter.defaultStyle(),
+            locale: Locales.thai
+        )
     }
 }
 
