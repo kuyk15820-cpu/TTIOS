@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Foundation
 import SwiftDate
 
 // MARK: - Native List Row Button Style ( Highlighting Effect )
@@ -18,21 +19,26 @@ struct NativeListRowButtonStyle: ButtonStyle {
 
 extension String {
     var toRelativeTimeText: String {
-        // 1. ใช้ SwiftDate ช่วย Parse String วันที่
+        // 1. สร้าง Calendar ค.ศ. (gregorian) สำหรับใช้คำนวณแบบ Explicit
+        var gregorianCalendar = Calendar(identifier: .gregorian)
+        gregorianCalendar.locale = Locale(identifier: "th_TH")
+        
+        // 2. Parse Date จาก String
         guard let date = self.toDate()?.date else {
             return self
         }
         
-        let safeDate = min(date, Date())
+        let now = Date()
+        let safeDate = min(date, now)
         
-        // 2. ตั้งค่า Formatter บังคับใช้ Calendar แบบ ค.ศ. (gregorian)
+        // 3. ตั้งค่า Formatter พร้อมระบุ @calendar=gregorian ใน Locale Identifier
         let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "th_TH")
-        formatter.calendar = Calendar(identifier: .gregorian) // 👈 เพิ่มบรรทัดนี้เพื่อแก้ปัญหา 543 ปี
+        formatter.locale = Locale(identifier: "th_TH@calendar=gregorian")
+        formatter.calendar = gregorianCalendar
         formatter.dateTimeStyle = .named
         formatter.unitsStyle = .full
         
-        return formatter.localizedString(for: safeDate, relativeTo: Date())
+        return formatter.localizedString(for: safeDate, relativeTo: now)
     }
 }
 
