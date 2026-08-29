@@ -83,7 +83,6 @@ struct ThreeOneOSFiveApp: App {
     // MARK: - Network Monitoring Logic
     private func startNetworkMonitoring() {
         networkMonitor.pathUpdateHandler = { path in
-            // เมื่อตรวจพบอินเทอร์เน็ต และระบบยังรอการเช็คเวอร์ชันอยู่
             if path.status == .satisfied {
                 DispatchQueue.main.async {
                     if self.isCheckingUpdate {
@@ -101,33 +100,37 @@ struct ThreeOneOSFiveApp: App {
         
         AppUpdateCheckerManager.shared.checkVersion { needsUpdate, downloadUrl, releaseNotes, serverVersion in
             Task { @MainActor in
-                // 🟢 แก้ไขจุดบัค: เช็คว่าหาก Request ล้มเหลว (ค่าว่างและไม่มีเน็ต) ให้ return ข้ามไปรอเน็ตใหม่
-                // แต่ถ้า Server ตอบกลับแล้ว (ถึงแม้อัปเดตจะเป็น false) จะทำงานบรรทัดล่างต่อเพื่อปิด Splash Screen
                 if serverVersion.isEmpty && !needsUpdate && downloadUrl == nil {
                     return 
                 }
 
                 let elapsedTime = Date().timeIntervalSince(startTime)
-                let minDuration: TimeInterval = 1.0 // หน่วงเวลาอย่างน้อย 1 วินาที
+                let minDuration: TimeInterval = 1.0
                 
                 if elapsedTime < minDuration {
                     let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
                     try? await Task.sleep(nanoseconds: remainingTime)
                 }
                 
-                // 🟢 เช็คสำเร็จ สั่งปิด Splash Screen เข้าหน้าหลักเสมอ
-                withAnimation(.easeOut(duration: 0.3)) {
-                    self.isCheckingUpdate = false
-                }
                 self.networkMonitor.cancel()
                 
-                // ถ้ามีอัปเดตค่อยแสดงผล Update UI
                 if needsUpdate {
+                    // เรียก Update UI ทันทีในขณะที่ Splash ยังบังหน้าหลักอยู่
                     AppUpdateCheckerManager.shared.presentUpdateUI(
                         downloadUrl: downloadUrl,
                         releaseNotes: releaseNotes,
                         versionString: serverVersion
                     )
+                    
+                    // ปิด Splash Screen อย่างนุ่มนวล
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        self.isCheckingUpdate = false
+                    }
+                } else {
+                    // ไม่มีอัปเดต เข้าหน้าหลักปกติ
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        self.isCheckingUpdate = false
+                    }
                 }
             }
         }
