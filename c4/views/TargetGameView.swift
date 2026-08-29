@@ -13,7 +13,6 @@ struct TargetGameView: View {
         TargetGameApp(bundleID: "com.apple.mobile.MobileHouseArrest") 
     ]
 
-    // 1. ใช้ @State ควบคุมรายการแอปที่จะแสดงผลโดยตรง
     @State private var currentApps: [TargetGameApp] = []
 
     var body: some View {
@@ -21,23 +20,59 @@ struct TargetGameView: View {
             List {
                 Section {
                     ForEach(currentApps) { app in
-                        NavigationLink(value: app) {
-                            HStack(spacing: 12) {
-                                if let icon = app.icon {
-                                    Image(uiImage: icon)
-                                        .resizable()
-                                        .frame(width: 32, height: 32)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                } else {
-                                    Image(systemName: "app.window.checkmark")
-                                        .font(.title2)
-                                        .foregroundStyle(Color.primary)
+                        if updateManager.isUpdateNeeded {
+                            // 🟢 โหมดอัปเดต: กดแล้วสั่งเริ่มดาวน์โหลดไฟล์
+                            Button {
+                                if !updateManager.isDownloading, let downloadUrl = updateManager.downloadUrl {
+                                    updateManager.startDownload(from: downloadUrl)
                                 }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    if let icon = app.icon {
+                                        Image(uiImage: icon)
+                                            .resizable()
+                                            .frame(width: 32, height: 32)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    } else {
+                                        Image(systemName: "app.window.checkmark")
+                                            .font(.title2)
+                                            .foregroundStyle(Color.primary)
+                                    }
 
-                                Text(app.name)
-                                    .font(.headline)
+                                    Text(app.name)
+                                        .font(.headline)
+                                        .foregroundStyle(Color.primary)
+
+                                    Spacer()
+
+                                    // แสดง Spinner ด้านขวาขณะกำลังดาวน์โหลด
+                                    if updateManager.isDownloading {
+                                        ActivityIndicator(isAnimating: true, style: .medium)
+                                    }
+                                }
+                                .contentShape(Rectangle())
                             }
-                            .contentShape(Rectangle())
+                            .disabled(updateManager.isDownloading)
+                        } else {
+                            // 🔵 โหมดปกติ: ไปยังหน้า QuickApplyView
+                            NavigationLink(value: app) {
+                                HStack(spacing: 12) {
+                                    if let icon = app.icon {
+                                        Image(uiImage: icon)
+                                            .resizable()
+                                            .frame(width: 32, height: 32)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    } else {
+                                        Image(systemName: "app.window.checkmark")
+                                            .font(.title2)
+                                            .foregroundStyle(Color.primary)
+                                    }
+
+                                    Text(app.name)
+                                        .font(.headline)
+                                }
+                                .contentShape(Rectangle())
+                            }
                         }
                     }
                 } header: {
@@ -45,17 +80,15 @@ struct TargetGameView: View {
                 }
             }
             .listStyle(.plain)
-            .navigationTitle(updateManager.isUpdateNeeded ? "อัปเดตซอฟต์แวร์" : "หน้าแรก")
+            .navigationTitle(updateManager.isUpdateNeeded ? "c4" : "หน้าแรก")
             .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: TargetGameApp.self) { app in
                 QuickApplyView(selectedApp: app)
             }
-            // 2. โหลดค่าเริ่มต้นเมื่อ View ปรากฏ
             .onAppear {
                 updateAppList(needsUpdate: updateManager.isUpdateNeeded)
                 updateManager.checkVersion()
             }
-            // 3. ดักฟังการเปลี่ยนแปลงของ isUpdateNeeded และอัปเดต List ทันทีบน Main Thread
             .onChange(of: updateManager.isUpdateNeeded) { needsUpdate in
                 withAnimation(.easeInOut(duration: 0.25)) {
                     updateAppList(needsUpdate: needsUpdate)
@@ -64,7 +97,6 @@ struct TargetGameView: View {
         }
     }
 
-    // ฟังก์ชันสำหรับสลับรายการแอป
     private func updateAppList(needsUpdate: Bool) {
         if needsUpdate {
             currentApps = myOwnApps
