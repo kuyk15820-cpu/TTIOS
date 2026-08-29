@@ -133,11 +133,11 @@ jobs:
             puts 'Added Swift Package: Particles'
           end
 
-          # 🟢 5. Sync ไฟล์ .swift, .m และ .h เข้า Compile Sources และ Project (รวม SecretKeys.swift ที่เพิ่ง generate มาด้วย)
+          # 🟢 5. Sync ไฟล์ .swift, .m, .mm, .cpp และ .h เข้า Compile Sources และ Project
           source_phase = target.source_build_phase
           existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
 
-          Dir.glob('**/*.{swift,m,h}').each do |source_file|
+          Dir.glob('**/*.{swift,m,mm,cpp,h}').each do |source_file|
             next if source_file.start_with?('Pods/', 'Build/', '.build/', 'DerivedData/')
             
             file_abs_path = File.expand_path(source_file)
@@ -147,7 +147,7 @@ jobs:
               file_ref = project.main_group.new_file(source_file)
             end
 
-            if source_file.end_with?('.swift', '.m')
+            if source_file.end_with?('.swift', '.m', '.mm', '.cpp')
               unless existing_files.include?(file_abs_path) || source_phase.files_references.include?(file_ref)
                 source_phase.add_file_reference(file_ref)
                 puts "Added to compile sources: #{source_file}"
