@@ -37,6 +37,16 @@ class AppUpdateCheckerManager: ObservableObject {
     
     private init() {}
     
+    // MARK: - Debug Helper Alert (แสดง Popup เด้งเตือนเพื่อดู Log บนหน้าจอจริง)
+    private func showDebugAlert(title: String, message: String) {
+        DispatchQueue.main.async {
+            guard let topVC = self.getTopViewController() else { return }
+            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "ตกลง", style: .default, handler: nil))
+            topVC.present(alert, animated: true, completion: nil)
+        }
+    }
+    
     // MARK: - Start Checking Version
     func checkVersion(handler: UpdateCheckHandler? = nil) {
         if let customHandler = handler {
@@ -44,6 +54,7 @@ class AppUpdateCheckerManager: ObservableObject {
         }
         
         guard let url = URL(string: "https://f1x3r.org/pv/app_version.php") else {
+            print("❌ [CheckVersion]: Invalid URL")
             return
         }
         
@@ -125,7 +136,12 @@ class AppUpdateCheckerManager: ObservableObject {
     
     // MARK: - Download Action
     func startDownload(from urlString: String) {
-        guard let url = URL(string: urlString) else { return }
+        guard let url = URL(string: urlString) else {
+            showDebugAlert(title: "⚠️ Download Error", message: "URL ดาวน์โหลดไม่ถูกต้อง")
+            return
+        }
+        
+        print("🚀 [Start Download]: Starting request for URL: \(urlString)")
         
         DispatchQueue.main.async {
             self.isDownloading = true
@@ -133,7 +149,7 @@ class AppUpdateCheckerManager: ObservableObject {
             self.downloadProgress = 0.0
             self.totalBytesWritten = 0
             self.totalBytesExpected = 0
-            self.downloadSizeText = "0 MB"
+            self.downloadSizeText = "กำลังเริ่ม..."
             self.currentDownloadFileURL = nil
         }
         
@@ -144,6 +160,7 @@ class AppUpdateCheckerManager: ObservableObject {
             
             if let error = error {
                 print("❌ [Download Error]: \(error.localizedDescription)")
+                self.showDebugAlert(title: "❌ Download Error", message: error.localizedDescription)
                 DispatchQueue.main.async {
                     self.isDownloading = false
                     self.isDownloaded = false
@@ -152,9 +169,23 @@ class AppUpdateCheckerManager: ObservableObject {
             }
             
             guard let tempURL = tempURL,
-                  let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
+                  let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [Download Response Error]: Invalid server response")
+                self.showDebugAlert(title: "❌ Download Error", message: " Server ตอบกลับไม่ถูกต้อง")
+                DispatchQueue.main.async {
+                    self.isDownloading = false
+                    self.isDownloaded = false
+                }
+                return
+            }
+            
+            // Log ข้อมูล Response Headers เพื่อตรวจขนาดไฟล์และ Encoding
+            let contentLengthHeader = httpResponse.allHeaderFields["Content-Length"] as? String ?? "ไม่มี"
+            let transferEncodingHeader = httpResponse.allHeaderFields["Transfer-Encoding"] as? String ?? "ไม่มี"
+            print("🌐 [Server Response] Code: \(httpResponse.statusCode) | Content-Length Header: \(contentLengthHeader) | Transfer-Encoding: \(transferEncodingHeader)")
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                self.showDebugAlert(title: "❌ Server Error", message: "HTTP Status Code: \(httpResponse.statusCode)")
                 DispatchQueue.main.async {
                     self.isDownloading = false
                     self.isDownloaded = false
@@ -185,6 +216,7 @@ class AppUpdateCheckerManager: ObservableObject {
                 
             } catch {
                 print("❌ [File Operation Error]: \(error.localizedDescription)")
+                self.showDebugAlert(title: "❌ File Error", message: error.localizedDescription)
                 DispatchQueue.main.async {
                     self.isDownloading = false
                     self.isDownloaded = false
@@ -192,7 +224,9 @@ class AppUpdateCheckerManager: ObservableObject {
             }
         }
         
+        NotificationCenter.default.removeObserver(self, name: Notification.Name("URLSessionDownloadProgress"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(downloadProgressChanged), name: Notification.Name("URLSessionDownloadProgress"), object: downloadTask)
+        
         downloadTask?.resume()
     }
     
@@ -201,7 +235,12 @@ class AppUpdateCheckerManager: ObservableObject {
               task == downloadTask,
               let userInfo = notification.userInfo,
               let written = userInfo["written"] as? Int64,
-              let expected = userInfo["expected"] as? Int64 else { return }
+              let expected = userInfo["expected"] as? Int64 else {
+            print("⚠️ [Notification Error]: แกะกล่อง userInfo ไม่สำเร็จ")
+            return
+        }
+        
+        print("📊 [Progress Log] Written: \(written) Bytes | Expected: \(expected) Bytes")
         
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useMB, .useKB, .useGB]
@@ -212,13 +251,13 @@ class AppUpdateCheckerManager: ObservableObject {
         let sizeText: String
         let progress: Double
         
-        // ตรวจสอบว่า Server ได้ส่ง Content-Length (expected > 0) มาหรือไม่
+        // ตรวจสอบว่า Server ส่ง Content-Length (expected > 0) มาหรือไม่
         if expected > 0 {
             let expectedString = formatter.string(fromByteCount: expected)
             sizeText = "\(writtenString) / \(expectedString)"
             progress = Double(written) / Double(expected)
         } else {
-            // กรณี Server ไม่ส่งขนาดไฟล์รวมมา ให้แสดงเฉพาะขนาดที่โหลดได้ขณะนั้น
+            // กรณี Server ไม่ส่งขนาดไฟล์รวมมา ให้แสดงเฉพาะขนาดที่โหลดได้ขณะนั้น เช่น "12.5 MB"
             sizeText = writtenString
             progress = 0.0
         }
@@ -285,6 +324,9 @@ class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
     static let shared = DownloadProgressDelegate()
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        
+        print("⚡️ [Delegate Event] totalBytesWritten: \(totalBytesWritten) | totalBytesExpectedToWrite: \(totalBytesExpectedToWrite)")
+        
         let userInfo: [String: Any] = [
             "written": totalBytesWritten,
             "expected": totalBytesExpectedToWrite
@@ -296,5 +338,7 @@ class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
         )
     }
     
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) { }
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        print("🏁 [Delegate Event] Finished downloading to: \(location.path)")
+    }
 }
