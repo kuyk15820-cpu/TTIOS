@@ -78,18 +78,29 @@ struct ThreeOneOSFiveApp: App {
         }
     }
 
-    // MARK: - Helper Function เช็คเวอร์ชันพร้อมควบคุม Splash Screen
+        // MARK: - Helper Function เช็คเวอร์ชันพร้อมหน่วงเวลา Splash Screen 1 วินาที
     private func performUpdateCheck() {
         isCheckingUpdate = true
+        let startTime = Date() // บันทึกเวลาเริ่มต้น
         
         AppUpdateCheckerManager.shared.checkVersion { needsUpdate, downloadUrl, releaseNotes, serverVersion in
-            DispatchQueue.main.async {
-                // ซ่อน Splash Screen ออกไปด้วย Animation Fade Out
+            Task { @MainActor in
+                // คำนวณเวลาที่ใช้ไป
+                let elapsedTime = Date().timeIntervalSince(startTime)
+                let minDuration: TimeInterval = 1.0 // กำหนดเวลาขั้นต่ำ 1 วินาที
+                
+                // ถ้าเช็คเสร็จเร็วกว่า 1 วินาที ให้สั่ง sleep รอจนครบเวลา
+                if elapsedTime < minDuration {
+                    let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
+                    try? await Task.sleep(nanoseconds: remainingTime)
+                }
+                
+                // ปิด Splash Screen ด้วย Animation Fade Out
                 withAnimation(.easeOut(duration: 0.3)) {
                     self.isCheckingUpdate = false
                 }
                 
-                // ถ้าพบว่ามีอัปเดต ให้แสดงหน้า AppUpdateView
+                // แสดงหน้า Update UI ถ้ามีเวอร์ชันใหม่
                 if needsUpdate {
                     AppUpdateCheckerManager.shared.presentUpdateUI(
                         downloadUrl: downloadUrl,
@@ -100,7 +111,6 @@ struct ThreeOneOSFiveApp: App {
             }
         }
     }
-}
 
 // MARK: - AppState
 class AppState: ObservableObject {
