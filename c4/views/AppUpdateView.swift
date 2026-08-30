@@ -47,7 +47,7 @@ struct AppUpdateView: View {
                                 .frame(width: 76, height: 76)
                                 .shadow(color: Color.blue.opacity(0.35), radius: 12, x: 0, y: 6)
 
-                            Image(systemName: "globe.asia.australia.fill")
+                            Image(systemName: SecretKeys.updateIconGlobe)
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 42, height: 42)
@@ -56,12 +56,12 @@ struct AppUpdateView: View {
 
                         // Headline & Description
                         VStack(alignment: .leading, spacing: 14) {
-                            Text("Update your\napplication to the\nlatest version")
+                            Text(SecretKeys.updateTitleText)
                                 .font(.system(size: 30, weight: .bold, design: .default))
                                 .foregroundColor(.white)
                                 .lineSpacing(4)
 
-                            Text(releaseNotes?.isEmpty == false ? releaseNotes! : "A brand new version of the app is available. Please update your app to use all of our amazing features.")
+                            Text(releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes)
                                 .font(.system(size: 15, weight: .regular))
                                 .foregroundColor(Color(white: 0.65))
                                 .lineSpacing(5)
@@ -85,17 +85,17 @@ struct AppUpdateView: View {
                             if updateManager.isDownloading {
                                 ActivityIndicator(isAnimating: true, style: .medium)
                                 
-                                Text(updateManager.downloadSizeText.isEmpty ? "Downloading..." : updateManager.downloadSizeText)
+                                Text(updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText)
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.white)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
                             } else if updateManager.isDone {
-                                Text("Done")
+                                Text(SecretKeys.updateBtnDone)
                                     .font(.system(size: 17, weight: .semibold))
                                     .foregroundColor(.white)
                             } else {
-                                Text("Update now")
+                                Text(SecretKeys.updateBtnNow)
                                     .font(.system(size: 17, weight: .semibold))
                                     .foregroundColor(.white)
                             }
