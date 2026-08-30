@@ -19,7 +19,8 @@ extension URLSession {
     static var pinned: URLSession = {
         let config = URLSessionConfiguration.default
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        config.timeoutInterval = 15.0
+        config.timeoutIntervalForRequest = 15.0 // 🟢 แก้ไขเป็น timeoutIntervalForRequest
+        config.timeoutIntervalForResource = 30.0 // (Optional) ใส่เพิ่มได้ถ้าต้องการคุมเวลาดาวน์โหลดไฟล์จนจบ
         return URLSession(configuration: config, delegate: SSLPinningDelegate.shared, delegateQueue: nil)
     }()
 }
