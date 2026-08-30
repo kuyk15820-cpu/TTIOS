@@ -285,7 +285,6 @@ struct QuickApplyView: View {
             .padding(.vertical, 10)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
-            .animation(.easeInOut(duration: 0.25), value: isApplied)
             .animation(.easeInOut(duration: 0.25), value: viewModel.isMultiSelectMode)
         }
         .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
