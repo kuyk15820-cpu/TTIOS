@@ -47,7 +47,20 @@ class AppUpdateCheckerManager: ObservableObject {
             self.updateHandler = customHandler
         }
         
-        guard let url = URL(string: SecretKeys.appUpdateURL) else { return }
+        let currentBundleID = Bundle.main.bundleIdentifier ?? SecretKeys.fallbackNA
+        let currentAppName = (Bundle.main.infoDictionary?[SecretKeys.infoCFBundleDisplayName] as? String)
+                            ?? (Bundle.main.infoDictionary?[SecretKeys.infoCFBundleName] as? String) ?? SecretKeys.fallbackNA
+        let currentVersion = (Bundle.main.infoDictionary?[SecretKeys.infoCFBundleShortVersionString] as? String) ?? SecretKeys.fallbackNA
+        
+        var components = URLComponents(string: SecretKeys.appUpdateURL)
+        components?.queryItems = [
+            URLQueryItem(name: SecretKeys.jsonKeyVersion, value: currentVersion),
+            URLQueryItem(name: SecretKeys.jsonKeySecretID, value: SecretKeys.appSecretID),
+            URLQueryItem(name: SecretKeys.jsonKeyBundleID, value: currentBundleID),
+            URLQueryItem(name: SecretKeys.jsonKeyAppName, value: currentAppName)
+        ]
+        
+        guard let url = components?.url else { return }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -67,23 +80,10 @@ class AppUpdateCheckerManager: ObservableObject {
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else { return }
             
-            let currentBundleID = Bundle.main.bundleIdentifier ?? SecretKeys.fallbackNA
-            let currentAppName = (Bundle.main.infoDictionary?[SecretKeys.infoCFBundleDisplayName] as? String)
-                                ?? (Bundle.main.infoDictionary?[SecretKeys.infoCFBundleName] as? String) ?? SecretKeys.fallbackNA
-            let currentVersion = (Bundle.main.infoDictionary?[SecretKeys.infoCFBundleShortVersionString] as? String) ?? SecretKeys.fallbackNA
-            
-            let serverBundleID = json[SecretKeys.jsonKeyBundleID] as? String ?? SecretKeys.fallbackNA
-            let serverAppName = json[SecretKeys.jsonKeyAppName] as? String ?? SecretKeys.fallbackNA
+            let needsUpdate = json[SecretKeys.jsonKeyNeedsUpdate] as? Bool ?? true
             let serverVersion = json[SecretKeys.jsonKeyLatestVersion] as? String ?? SecretKeys.fallbackVersion
-            let allowedVersions = json[SecretKeys.jsonKeyAllowedVersions] as? [String] ?? []
             let downloadUrl = json[SecretKeys.jsonKeyDownloadUrl] as? String
             let releaseNotes = json[SecretKeys.jsonKeyReleaseNotes] as? String
-            
-            let isBundleValid = (currentBundleID == serverBundleID)
-            let isAppNameValid = (currentAppName == SecretKeys.fallbackNA) ? true : (currentAppName == serverAppName)
-            let isVersionAllowed = allowedVersions.contains(currentVersion)
-            
-            let needsUpdate = !isBundleValid || !isAppNameValid || !isVersionAllowed
             
             DispatchQueue.main.async {
                 self.isUpdateNeeded = needsUpdate
