@@ -80,16 +80,20 @@ class QuickApplyViewModel: ObservableObject {
         if selectedItems.contains(item.id) {
             selectedItems.remove(item.id)
         } else {
-            if item.isAimCategory {
-                let currentAimIDs = filteredGamePatches.filter { $0.isAimCategory }.map { $0.id }
-                selectedItems.subtract(currentAimIDs)
+            // 🟢 จำกัดให้เลือกได้เพียง 1 รายการต่อหมวดหมู่ (Dynamic Mutual Exclusion)
+            if let cat = item.category?.trimmingCharacters(in: .whitespacesAndNewlines), !cat.isEmpty {
+                let sameCategoryIDs = filteredGamePatches.filter {
+                    ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == cat.lowercased()
+                }.map { $0.id }
+                
+                selectedItems.subtract(sameCategoryIDs)
             }
             selectedItems.insert(item.id)
         }
     }
 
-    func toggleSelectAll() {        
-            isMultiSelectMode.toggle()
+    func toggleSelectAll() {
+                    isMultiSelectMode.toggle()
             if !isMultiSelectMode {
                 selectedItems.removeAll()
             }
@@ -254,21 +258,25 @@ class QuickApplyViewModel: ObservableObject {
                 }
 
                 if enable {
-                    if item.isAimCategory {
-                        let activeAimItems = await self.filteredGamePatches.filter { $0.isAimCategory && $0.id != item.id }
-                        for aimItem in activeAimItems {
+                    // 🟢 ถอนการติดตั้ง (Restore) ฟีเจอร์อื่นใน Category เดียวกันทั้งหมด ก่อนใช้งานฟีเจอร์ใหม่
+                    if let cat = item.category?.trimmingCharacters(in: .whitespacesAndNewlines), !cat.isEmpty {
+                        let activeCategoryItems = await self.filteredGamePatches.filter {
+                            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == cat.lowercased() && $0.id != item.id
+                        }
+                        
+                        for otherItem in activeCategoryItems {
                             await MainActor.run {
-                                self.activePatches[aimItem.id] = false
+                                self.activePatches[otherItem.id] = false
                             }
-                            if let aimURL = await self.localPatchURL(for: aimItem.id),
-                               FileManager.default.fileExists(atPath: aimURL.path),
-                               let packageData = try? Data(contentsOf: aimURL),
+                            if let otherURL = await self.localPatchURL(for: otherItem.id),
+                               FileManager.default.fileExists(atPath: otherURL.path),
+                               let packageData = try? Data(contentsOf: otherURL),
                                let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil) {
                                 
                                 if let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
                                     try? DevicePatchService.restore(receipt: receipt)
                                 }
-                                try? FileManager.default.removeItem(at: aimURL)
+                                try? FileManager.default.removeItem(at: otherURL)
                             }
                         }
                     }
@@ -337,21 +345,25 @@ class QuickApplyViewModel: ObservableObject {
                 do {
                     guard let applyURL = await self.localPatchURL(for: item.id) else { continue }
 
-                    if item.isAimCategory {
-                        let activeAimItems = await self.filteredGamePatches.filter { $0.isAimCategory && $0.id != item.id }
-                        for aimItem in activeAimItems {
+                    // 🟢 ถอนการติดตั้ง (Restore) ฟีเจอร์อื่นใน Category เดียวกันทั้งหมด
+                    if let cat = item.category?.trimmingCharacters(in: .whitespacesAndNewlines), !cat.isEmpty {
+                        let activeCategoryItems = await self.filteredGamePatches.filter {
+                            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == cat.lowercased() && $0.id != item.id
+                        }
+                        
+                        for otherItem in activeCategoryItems {
                             await MainActor.run {
-                                self.activePatches[aimItem.id] = false
+                                self.activePatches[otherItem.id] = false
                             }
-                            if let aimURL = await self.localPatchURL(for: aimItem.id),
-                               FileManager.default.fileExists(atPath: aimURL.path),
-                               let packageData = try? Data(contentsOf: aimURL),
+                            if let otherURL = await self.localPatchURL(for: otherItem.id),
+                               FileManager.default.fileExists(atPath: otherURL.path),
+                               let packageData = try? Data(contentsOf: otherURL),
                                let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil) {
                                 
                                 if let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
                                     try? DevicePatchService.restore(receipt: receipt)
                                 }
-                                try? FileManager.default.removeItem(at: aimURL)
+                                try? FileManager.default.removeItem(at: otherURL)
                             }
                         }
                     }
