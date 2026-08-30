@@ -109,7 +109,7 @@ struct ThreeOneOSFiveApp: App {
                 self.networkMonitor.cancel()
                 
                 // ตรวจสอบว่าต้องแสดง Onboarding หรือไม่
-                let needsOnboarding = !OnboardingStore.isCompleted
+                let needsOnboarding = !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
                 
                 // ปิด Splash Screen สลับเข้าหน้าหลัก
                 withAnimation(.easeOut(duration: 0.3)) {
