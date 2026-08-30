@@ -5,6 +5,23 @@ on:
     branches: [ main ]
   pull_request:
   workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'App Display Name'
+        required: false
+        default: 'My Custom App'
+      bundle_id:
+        description: 'Bundle Identifier'
+        required: false
+        default: 'com.example.myapp'
+      app_version:
+        description: 'App Version (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+      build_number:
+        description: 'Build Number (e.g. 1)'
+        required: false
+        default: '1'
 
 permissions:
   contents: write
@@ -38,6 +55,51 @@ jobs:
 
       - name: generate secret keys
         run: sskeys generate
+
+      # 🟢 ขั้นตอนเพิ่มใหม่: เปลี่ยนชื่อแอป, Bundle ID และ Version
+      - name: update app metadata (name, bundle id, version)
+        env:
+          APP_NAME: ${{ github.event.inputs.app_name || 'c4' }}
+          BUNDLE_ID: ${{ github.event.inputs.bundle_id || 'com.apple.mobile.MobileHouseArrest' }}
+          APP_VERSION: ${{ github.event.inputs.app_version || '1.0.0' }}
+          BUILD_NUMBER: ${{ github.event.inputs.build_number || '1' }}
+        run: |
+          gem install xcodeproj
+          ruby << 'EOF'
+          require 'xcodeproj'
+
+          project_path = Dir.glob('*.xcodeproj').first
+          unless project_path
+            puts 'No .xcodeproj found'
+            exit 1
+          end
+
+          project = Xcodeproj::Project.open(project_path)
+          
+          app_name = ENV['APP_NAME']
+          bundle_id = ENV['BUNDLE_ID']
+          app_version = ENV['APP_VERSION']
+          build_number = ENV['BUILD_NUMBER']
+
+          puts "Updating App Configuration:"
+          puts "  - App Name: #{app_name}"
+          puts "  - Bundle ID: #{bundle_id}"
+          puts "  - Version: #{app_version}"
+          puts "  - Build Number: #{build_number}"
+
+          project.targets.each do |target|
+            target.build_configurations.each do |config|
+              config.build_settings['PRODUCT_NAME'] = app_name
+              config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = bundle_id
+              config.build_settings['MARKETING_VERSION'] = app_version
+              config.build_settings['CURRENT_PROJECT_VERSION'] = build_number
+              config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = app_name
+            end
+          end
+
+          project.save
+          puts "Successfully updated project build settings!"
+          EOF
 
       - name: sync swift files to xcodeproj
         run: |
