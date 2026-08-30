@@ -91,6 +91,7 @@ struct QuickApplyView: View {
             if viewModel.isLoadingCatalog {
                 VStack {
                     Spacer()
+                    ProgressView()
                     Spacer()
                 }
             } else if viewModel.displayedPatches.isEmpty {
@@ -169,6 +170,18 @@ struct QuickApplyView: View {
                 .disabled(viewModel.isLoadingCatalog || viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch)
                 .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
             }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { showLogs = true } label: {
+                    Image(systemName: SecretKeys.iconTerminal)
+                }
+                .accessibilityLabel(SecretKeys.textAccessibilityLogs)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { showSettings = true } label: {
+                    Image(systemName: SecretKeys.iconSettings)
+                }
+                .accessibilityLabel(SecretKeys.textAccessibilitySettings)
+            }
         }
         .task {
             await viewModel.fetchCatalog()
@@ -240,7 +253,6 @@ struct QuickApplyView: View {
 
                 if isRowProcessing {
                     ActivityIndicator(isAnimating: true, style: .medium)
-                        .transition(.opacity)
                 } else if !isServerActive {
                     if isApplied {
                         Text(SecretKeys.textRestorePatch)
