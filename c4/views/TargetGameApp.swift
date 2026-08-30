@@ -26,18 +26,18 @@ struct TargetGameApp: Identifiable, Hashable {
 
     private static func fetchAppName(for bundleID: String) -> String {
         let presetApps: [String: String] = [
-            "com.dts.freefireth": "Free Fire",
-            "com.dts.freefiremax": "Free Fire MAX"
+            SecretKeys.bundleFFTH: SecretKeys.nameFFTH,
+            SecretKeys.bundleFFMAX: SecretKeys.nameFFMAX
         ]
         
         if let presetName = presetApps[bundleID] {
             return presetName
         }
 
-        if let proxyClass = NSClassFromString("LSApplicationProxy") as? NSObject.Type,
-           let proxy = proxyClass.perform(Selector(("applicationProxyForIdentifier:")), with: bundleID)?.takeUnretainedValue() as? NSObject {
+        if let proxyClass = NSClassFromString(SecretKeys.classNameLSApplicationProxy) as? NSObject.Type,
+           let proxy = proxyClass.perform(Selector((SecretKeys.selectorAppProxyForIdentifier)), with: bundleID)?.takeUnretainedValue() as? NSObject {
             
-            if let localizedName = proxy.perform(Selector(("localizedName")))?.takeUnretainedValue() as? String, !localizedName.isEmpty {
+            if let localizedName = proxy.perform(Selector((SecretKeys.selectorLocalizedName)))?.takeUnretainedValue() as? String, !localizedName.isEmpty {
                 return localizedName
             }
         }
