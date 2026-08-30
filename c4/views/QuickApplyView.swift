@@ -91,7 +91,6 @@ struct QuickApplyView: View {
             if viewModel.isLoadingCatalog {
                 VStack {
                     Spacer()
-                    ProgressView()
                     Spacer()
                 }
             } else if viewModel.displayedPatches.isEmpty {
@@ -169,18 +168,6 @@ struct QuickApplyView: View {
                 }
                 .disabled(viewModel.isLoadingCatalog || viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch)
                 .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showLogs = true } label: {
-                    Image(systemName: SecretKeys.iconTerminal)
-                }
-                .accessibilityLabel(SecretKeys.textAccessibilityLogs)
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showSettings = true } label: {
-                    Image(systemName: SecretKeys.iconSettings)
-                }
-                .accessibilityLabel(SecretKeys.textAccessibilitySettings)
             }
         }
         .task {
@@ -276,14 +263,12 @@ struct QuickApplyView: View {
                     Text(SecretKeys.textActiveState)
                         .font(.subheadline.bold())
                         .foregroundStyle(.green)
-                        .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
-            .animation(.easeInOut(duration: 0.25), value: isApplied)
             .animation(.easeInOut(duration: 0.25), value: viewModel.isMultiSelectMode)
         }
         .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
