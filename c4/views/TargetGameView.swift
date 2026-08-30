@@ -4,8 +4,8 @@ struct TargetGameView: View {
     @StateObject private var updateManager = AppUpdateCheckerManager.shared
 
     private let defaultApps: [TargetGameApp] = [
-        TargetGameApp(bundleID: "com.dts.freefireth"),
-        TargetGameApp(bundleID: "com.dts.freefiremax")        
+        TargetGameApp(bundleID: SecretKeys.bundleFFTH),
+        TargetGameApp(bundleID: SecretKeys.bundleFFMAX)        
     ]
 
     var body: some View {
@@ -31,7 +31,7 @@ struct TargetGameView: View {
                                                 .frame(width: 32, height: 32)
                                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                         } else {
-                                            Image(systemName: "app.window.checkmark")
+                                            Image(systemName: SecretKeys.iconAppWindowCheckmark)
                                                 .font(.title2)
                                                 .foregroundStyle(Color.primary)
                                         }
@@ -43,11 +43,11 @@ struct TargetGameView: View {
                                 }
                             }
                         } header: {
-                            Text("เลือกเกม")
+                            Text(SecretKeys.textSelectGameSection)
                         }
                     }
                     .listStyle(.plain)
-                    .navigationTitle("หน้าแรก")
+                    .navigationTitle(SecretKeys.textHomeNavigationTitle)
                     .navigationBarTitleDisplayMode(.large)
                     .navigationDestination(for: TargetGameApp.self) { app in
                         QuickApplyView(selectedApp: app)
