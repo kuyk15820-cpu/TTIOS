@@ -19,6 +19,9 @@ struct ThreeOneOSFiveApp: App {
     private let monitorQueue = DispatchQueue(label: "NetworkMonitorQueue")
 
     init() {
+        // 🟢 เริ่มต้นตั้งค่า SSL Pinning ทันทีตั้งแต่เปิดแอป ก่อนเริ่ม Network หรือ UI ใดๆ
+        LayoutMetricsHelper.shared.applyLayoutConstraints()
+        
         setupLogCapture()
         log("app: c4 launching — iOS \(AppInfo.osVersion) (\(AppInfo.osBuild)) \(AppInfo.machineName)")
     }
