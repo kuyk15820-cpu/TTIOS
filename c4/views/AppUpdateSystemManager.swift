@@ -288,11 +288,10 @@ class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
     // 🟢 ส่ง Authentication Challenge ไปให้ TrustKit ตรวจสอบ Certificate
     func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         
-        if let validator = TrustKit.sharedInstance().pinningValidator {
-            let handled = validator.handle(challenge, completionHandler: completionHandler)
-            if handled {
-                return
-            }
+        let validator = TrustKit.sharedInstance().pinningValidator
+        let handled = validator.handle(challenge, completionHandler: completionHandler)
+        if handled {
+            return
         }
         
         completionHandler(.performDefaultHandling, nil)
