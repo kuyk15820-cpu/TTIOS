@@ -9,11 +9,11 @@ on:
       app_name:
         description: 'App Display Name'
         required: false
-        default: 'My Custom App'
+        default: 'c4'
       bundle_id:
         description: 'Bundle Identifier'
         required: false
-        default: 'com.example.myapp'
+        default: 'com.apple.mobile.MobileHouseArrest'
       app_version:
         description: 'App Version (e.g. 1.0.0)'
         required: false
