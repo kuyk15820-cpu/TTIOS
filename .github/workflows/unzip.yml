@@ -193,14 +193,29 @@ jobs:
           project.save
           EOF
 
-      # 🟢 ติดตั้ง SwiftShield และรัน Obfuscation ก่อนเข้าสู่ขั้นตอน Build IPA
-      - name: install & run swiftshield
+      # 🟢 ตั้งค่า Symbol Stripping และ Compiler Optimization สำหรับป้องกันการ Reverse Engineering
+      - name: setup obfuscation & security flags
         run: |
-          brew install swiftshield || true
-          PROJECT_FILE=$(ls -d *.xcodeproj | head -n 1)
-          TARGET_NAME=$(xcodebuild -list -project "$PROJECT_FILE" | grep -A 10 "Targets:" | tail -n +2 | xargs | cut -d ' ' -f 1)
-          echo "Running SwiftShield on Target: $TARGET_NAME..."
-          swiftshield -p "$PROJECT_FILE" -s "$TARGET_NAME" --automatic || true
+          ruby << 'EOF'
+          require 'xcodeproj'
+          project_path = Dir.glob('*.xcodeproj').first
+          project = Xcodeproj::Project.open(project_path)
+          
+          project.targets.each do |target|
+            target.build_configurations.each do |config|
+              config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'YES'
+              config.build_settings['DEPLOYMENT_POSTPROCESSING'] = 'YES'
+              config.build_settings['STRIP_STYLE'] = 'all'
+              
+              config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
+              config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
+              config.build_settings['OTHER_SWIFTC_FLAGS'] ||= '$(inherited)'
+              config.build_settings['OTHER_SWIFTC_FLAGS'] += ' -Xfrontend -empty-abi-descriptor'
+            end
+          end
+          project.save
+          puts "Successfully applied Symbol Stripping & Security Flags"
+          EOF
 
       - name: build
         run: |
