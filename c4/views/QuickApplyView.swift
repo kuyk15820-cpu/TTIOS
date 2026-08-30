@@ -198,6 +198,7 @@ struct QuickApplyView: View {
         let isSelected = viewModel.selectedItems.contains(item.id)
         let isServerActive = item.active ?? true
         let isDisabled = viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch
+        let isRowProcessing = viewModel.processingItemID == item.id || (viewModel.isRestoringAll && isApplied) || (viewModel.isProcessingBatch && isSelected)
 
         Button {
             guard !isDisabled else { return }
@@ -250,30 +251,27 @@ struct QuickApplyView: View {
 
                 Spacer(minLength: 4)
 
-                if viewModel.processingItemID == item.id {
+                if isRowProcessing {
                     ActivityIndicator(isAnimating: true, style: .medium)
                         .transition(.opacity)
                 } else if !isServerActive {
-                    Group {
-                        if isApplied {
-                            Text(SecretKeys.textRestorePatch)
-                                .font(.subheadline.bold())
-                                .foregroundStyle(.red)
-                        } else {
-                            Text(SecretKeys.textMaintenance)
-                                .font(.caption2.bold())
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .foregroundStyle(.red)
-                                .background(Color.clear)
-                                .overlay(
-                                    Capsule()
-                                        .strokeBorder(Color.red, lineWidth: 1.0)
-                                )
-                                .clipShape(Capsule())
-                        }
+                    if isApplied {
+                        Text(SecretKeys.textRestorePatch)
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.red)
+                    } else {
+                        Text(SecretKeys.textMaintenance)
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .foregroundStyle(.red)
+                            .background(Color.clear)
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(Color.red, lineWidth: 1.0)
+                            )
+                            .clipShape(Capsule())
                     }
-                    .transaction { $0.animation = nil }
                 } else if isApplied {
                     Text(SecretKeys.textActiveState)
                         .font(.subheadline.bold())
@@ -285,6 +283,7 @@ struct QuickApplyView: View {
             .padding(.vertical, 10)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
+            .animation(.easeInOut(duration: 0.25), value: isApplied)
             .animation(.easeInOut(duration: 0.25), value: viewModel.isMultiSelectMode)
         }
         .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
