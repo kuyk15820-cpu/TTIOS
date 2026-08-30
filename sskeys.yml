@@ -122,22 +122,23 @@ keys:
   localeThaiGregorian: "th_TH@calendar=gregorian"
 
   # Aim Category Matching Keywords
-  aimKeywordCategory: "aim"
-  aimKeywordDrag: "ลาก"
-  aimKeywordHead: "หัว"
+  categoryAim: "aim"
+  searchKeyAim: "aim"
+  searchKeyDrag: "ลาก"
+  searchKeyHead: "หัว"
 
   # Target Game App Bundle Identifiers & Preset Names
-  bundleIDFreeFireTH: "com.dts.freefireth"
-  appNameFreeFireTH: "Free Fire"
-  bundleIDFreeFireMAX: "com.dts.freefiremax"
-  appNameFreeFireMAX: "Free Fire MAX"
+  bundleFFTH: "com.dts.freefireth"
+  nameFFTH: "Free Fire"
+  bundleFFMAX: "com.dts.freefiremax"
+  nameFFMAX: "Free Fire MAX"
 
   # Private Runtime Class & Selector Names (LSApplicationProxy)
-  lsProxyClassName: "LSApplicationProxy"
-  lsProxyAppForIdentifierSelector: "applicationProxyForIdentifier:"
-  lsProxyLocalizedNameSelector: "localizedName"
+  classNameLSApplicationProxy: "LSApplicationProxy"
+  selectorAppProxyForIdentifier: "applicationProxyForIdentifier:"
+  selectorLocalizedName: "localizedName"
 
   # TargetGameView Localized UI Strings & System Icons
-  targetGameIconFallback: "app.window.checkmark"
-  sectionTitleSelectGame: "เลือกเกม"
-  navTitleHome: "หน้าแรก"
+  iconAppWindowCheckmark: "app.window.checkmark"
+  textSelectGameSection: "เลือกเกม"
+  textHomeNavigationTitle: "หน้าแรก"
