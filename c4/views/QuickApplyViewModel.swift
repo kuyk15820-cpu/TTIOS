@@ -157,7 +157,8 @@ class QuickApplyViewModel: ObservableObject {
         )
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
 
-        let (tempURL, response) = try await URLSession.shared.download(for: request)
+        // 🟢 ใช้ URLSession.pinned ที่ผูก SSL Pinning Delegate ไว้แล้ว
+        let (tempURL, response) = try await URLSession.pinned.download(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
             throw PatchPackageError.invalidProject
@@ -186,7 +187,8 @@ class QuickApplyViewModel: ObservableObject {
             request.httpMethod = "GET"
             request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            // 🟢 ใช้ URLSession.pinned ที่ผูก SSL Pinning Delegate ไว้แล้ว
+            let (data, response) = try await URLSession.pinned.data(for: request)
             
             if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
                 let items = try JSONDecoder().decode([QuickPatchItem].self, from: data)
