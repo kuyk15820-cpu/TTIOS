@@ -10,7 +10,6 @@ struct ThreeOneOSFiveApp: App {
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
     
     @State private var showOnboarding = false 
-    @State private var showAttribution = false
     @State private var isCheckingUpdate = true // เริ่มต้นเป็น true เพื่อแสดง Splash Screen
     @Environment(\.scenePhase) private var scenePhase
 
@@ -63,10 +62,6 @@ struct ThreeOneOSFiveApp: App {
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
                     .zIndex(1000)
                 }
-            }
-            .displayIdentityAttribution(isPresented: $showAttribution, enabled: !showOnboarding && !isCheckingUpdate)
-            .sheet(isPresented: $showAttribution) {
-                DisplayAttributionSheet()
             }
             .onAppear {
                 isCheckingUpdate = true
