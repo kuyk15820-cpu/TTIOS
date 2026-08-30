@@ -150,7 +150,24 @@ jobs:
             puts 'Added Swift Package: SwiftDate'
           end
 
-          # 🟢 6. Sync ไฟล์ .swift, .m, .mm, .cpp และ .h เข้า Compile Sources และ Project
+          # 🟢 6. สั่งเพิ่ม Swift Package (TrustKit)
+          trustkit_url = 'https://github.com/datatheorem/TrustKit.git'
+          trustkit_ref = project.root_object.package_references.find { |p| p.repositoryURL == trustkit_url }
+          unless trustkit_ref
+            trustkit_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            trustkit_ref.repositoryURL = trustkit_url
+            trustkit_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '3.0.7' }
+            project.root_object.package_references << trustkit_ref
+            
+            trustkit_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            trustkit_product_dependency.product_name = 'TrustKit'
+            trustkit_product_dependency.package = trustkit_ref
+            
+            target.package_product_dependencies << trustkit_product_dependency
+            puts 'Added Swift Package: TrustKit'
+          end
+
+          # 🟢 7. Sync ไฟล์ .swift, .m, .mm, .cpp และ .h เข้า Compile Sources และ Project
           source_phase = target.source_build_phase
           existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
 
