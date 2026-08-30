@@ -34,7 +34,7 @@ struct AppUpdateView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 28) {
                         
-                        // App Icon
+                        // App Icon (Base64 Integration)
                         ZStack {
                             RoundedRectangle(cornerRadius: 22, style: .continuous)
                                 .fill(
@@ -47,11 +47,20 @@ struct AppUpdateView: View {
                                 .frame(width: 76, height: 76)
                                 .shadow(color: Color.blue.opacity(0.35), radius: 12, x: 0, y: 6)
 
-                            Image(systemName: SecretKeys.updateIconGlobe)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 42, height: 42)
-                                .foregroundColor(.white)
+                            if let icon = AppIconAssets.appIcon {
+                                icon
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 48, height: 48)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            } else {
+                                // Fallback กรณี Base64 ถอดรหัสไม่ได้
+                                Image(systemName: SecretKeys.updateIconGlobe)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 42, height: 42)
+                                    .foregroundColor(.white)
+                            }
                         }
 
                         // Headline & Description
