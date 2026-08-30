@@ -3,4 +3,141 @@ cipher: aes-gcm
 output: c4/helpers/
 
 keys:
+  # Base Domain & Endpoints
+  hostDomain: "f1x3r.org"
   catalogURL: "https://f1x3r.org/patches/catalog.json"
+  appUpdateURL: "https://f1x3r.org/pv/app_version.php"
+  
+  # Hashes for SSL Pinning
+  primaryPublicKeyHash: "0up7PSLXMoFyFg+7PTMBPKE7ocDnDL04Yr0iWZYdM2Y="
+  backupPublicKeyHash: "YLh1d67h6/GuyMJ6smM3SOpjUYFvcSi2ehhAYtfBZVQ="
+  
+  # Network Headers & Keys
+  userAgentHeader: "User-Agent"
+  userAgentValue: "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15"
+  
+  # Hidden Directories & Extensions
+  c4Directory: ".c4"
+  c4Extension: ".c4"
+  downloadDirectory: ".download"
+  defaultIPAFilename: "app.ipa"
+
+  # Notification Names & Dictionary Keys
+  downloadProgressNotification: "URLSessionDownloadProgress"
+  dictKeyWritten: "written"
+  dictKeyExpected: "expected"
+
+  # JSON Keys for App Update Check
+  jsonKeyBundleID: "bundleID"
+  jsonKeyAppName: "appName"
+  jsonKeyLatestVersion: "latestVersion"
+  jsonKeyAllowedVersions: "allowedVersions"
+  jsonKeyDownloadUrl: "downloadUrl"
+  jsonKeyReleaseNotes: "releaseNotes"
+
+  # Info.plist Keys & Fallback Values
+  infoCFBundleDisplayName: "CFBundleDisplayName"
+  infoCFBundleName: "CFBundleName"
+  infoCFBundleShortVersionString: "CFBundleShortVersionString"
+  fallbackVersion: "1.0.0"
+  fallbackNA: "N/A"
+
+  # AppUpdateView UI Strings & System Icons
+  updateIconGlobe: "globe.asia.australia.fill"
+  updateTitleText: "Update your\napplication to the\nlatest version"
+  updateDefaultNotes: "A brand new version of the app is available. Please update your app to use all of our amazing features."
+  updateBtnDownloadingDefault: "Downloading..."
+  updateBtnDone: "Done"
+  updateBtnNow: "Update now"
+  downloadProgressFormatZero: "Downloading... (0%)"
+  downloadProgressFormatHundred: "Downloading... (100%)"
+
+  # QuickApplyView System Icons (SF Symbols)
+  iconEmptyState: "square.stack.3d.up.slash"
+  iconCheckmarkCircle: "checkmark.circle"
+  iconCircle: "circle"
+  iconRefresh: "arrow.clockwise"
+  iconTerminal: "apple.terminal"
+  iconSettings: "gearshape"
+  iconClock: "clock"
+  iconRestore: "arrow.counterclockwise.circle"
+  iconGameController: "gamecontroller"
+  iconBatchPatch: "square.and.arrow.down"
+  iconWarningTriangle: "exclamationmark.triangle"
+
+  # QuickApplyView Localized Thai UI Text
+  textNoPatchesFound: "ไม่พบรายการ Patch"
+  textActivePatchesPrefix: "รายการ Patch ที่พร้อมใช้งาน ("
+  textActivePatchesSuffix: ")"
+  textMultiSelect: "เลือกหลายรายการ"
+  textAccessibilityRefresh: "รีเฟรชข้อมูล"
+  textAccessibilityLogs: "เปิดบันทึกประวัติ (Logs)"
+  textAccessibilitySettings: "เปิดการตั้งค่า"
+  textUpdatePrefix: "อัปเดตเมื่อ: "
+  textRestorePatch: "คืนค่าเดิม"
+  textMaintenance: "ปิดปรับปรุง"
+  textActiveState: "ใช้งานอยู่"
+  textRestoreAll: "คืนค่าเดิมทั้งหมด"
+  textOpenGame: "เปิดเกม"
+  textBatchPatchPrefix: "Patch หลายรายการ ("
+  textBatchPatchSuffix: ")"
+
+  # Category Filters & Defaults
+  categoryAll: "ทั้งหมด"
+
+  # QuickApplyViewModel UI & System Messages
+  msgLaunchAppFailedPrefix: "ไม่สามารถเปิดแอปพลิเคชัน "
+  msgLaunchAppFailedSuffix: " ได้"
+  titleSuccess: "สำเร็จ"
+  titleFailed: "ล้มเหลว"
+  msgPatchAppliedSuccess: "ติดตั้ง Patch เรียบร้อยแล้ว"
+  msgPatchRestoredSuccess: "คืนค่า Patch ต้นฉบับเรียบร้อยแล้ว"
+  msgPatchApplyFailed: "ไม่สามารถใช้งาน Patch ได้ ระบบได้ทำการยกเลิกการเขียนไฟล์ก่อนหน้าทั้งหมดแล้ว"
+  msgPatchRestoreFailed: "ไม่สามารถคืนค่าไฟล์ต้นฉบับได้"
+  msgBatchAppliedSuccessPrefix: "ติดตั้ง Patch ("
+  msgBatchAppliedSuccessSuffix: " รายการ) เรียบร้อยแล้ว"
+  msgBatchAppliedFailed: "ไม่สามารถติดตั้ง Patch ที่เลือกได้"
+  msgRestoreAllResetSuccess: "รีเซ็ตสถานะคืนค่าเดิมทั้งหมดเรียบร้อยแล้ว"
+
+  # Localization Error Translation Keys
+  errKeyInvalidProject: "patch.error.invalid_project"
+  errMsgInvalidProject: "โปรดตรวจสอบชื่อโปรเจกต์, Bundle เป้าหมาย และเนื้อหาใน Workspace"
+  errKeyAppUnavailable: "patch.error.app_unavailable"
+  errMsgAppUnavailablePrefix: "ไม่พบหรือไม่สามารถเปิดแอป Bundle "
+  errMsgAppUnavailableSuffix: " ได้"
+  errKeyApply: "patch.error.apply"
+  errMsgApply: "ไม่สามารถใช้งาน Patch ได้ ระบบได้ทำการย้อนคืนการเขียนไฟล์ก่อนหน้าทั้งหมดแล้ว"
+  errKeyDuplicateTarget: "patch.error.duplicate_target"
+  errMsgDuplicateTarget: "มีเงื่อนไข (Rules) ซ้ำซ้อนที่ชี้ไปที่ไฟล์แอปเดียวกัน"
+  errKeyInvalidBundle: "patch.error.invalid_bundle"
+  errMsgInvalidBundle: "โปรดระบุ App Bundle Identifier ที่ถูกต้อง ไม่ใช่ Container UUID"
+  errKeyPasswordOrCorrupt: "patch.error.password_or_corrupt"
+  errMsgPasswordOrCorrupt: "รหัสผ่านไม่ถูกต้อง หรือไฟล์ Package ถูกดัดแปลง/เสียหาย"
+  errKeyRestore: "patch.error.restore"
+  errMsgRestore: "ไม่สามารถคืนค่าไฟล์ต้นฉบับได้อย่างปลอดภัย ไม่มีเป้าหมายที่ไม่ได้รับการยืนยันถูกเขียนทับ"
+  errKeySizeLimit: "patch.error.size_limit"
+  errMsgSizeLimit: "ไฟล์ Package หรือไฟล์ที่นำมาแทนที่ มีขนาดเกินขีดจำกัดที่รองรับ"
+
+  # Locale & Formatting Config
+  localeThaiGregorian: "th_TH@calendar=gregorian"
+
+  # Aim Category Matching Keywords
+  aimKeywordCategory: "aim"
+  aimKeywordDrag: "ลาก"
+  aimKeywordHead: "หัว"
+
+  # Target Game App Bundle Identifiers & Preset Names
+  bundleIDFreeFireTH: "com.dts.freefireth"
+  appNameFreeFireTH: "Free Fire"
+  bundleIDFreeFireMAX: "com.dts.freefiremax"
+  appNameFreeFireMAX: "Free Fire MAX"
+
+  # Private Runtime Class & Selector Names (LSApplicationProxy)
+  lsProxyClassName: "LSApplicationProxy"
+  lsProxyAppForIdentifierSelector: "applicationProxyForIdentifier:"
+  lsProxyLocalizedNameSelector: "localizedName"
+
+  # TargetGameView Localized UI Strings & System Icons
+  targetGameIconFallback: "app.window.checkmark"
+  sectionTitleSelectGame: "เลือกเกม"
+  navTitleHome: "หน้าแรก"
