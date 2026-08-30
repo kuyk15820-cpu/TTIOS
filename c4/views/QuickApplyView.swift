@@ -254,23 +254,26 @@ struct QuickApplyView: View {
                     ActivityIndicator(isAnimating: true, style: .medium)
                         .transition(.opacity)
                 } else if !isServerActive {
-                    if isApplied {
-                        Text(SecretKeys.textRestorePatch)
-                            .font(.subheadline.bold())
-                            .foregroundStyle(.red)
-                    } else {
-                        Text(SecretKeys.textMaintenance)
-                            .font(.caption2.bold())
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .foregroundStyle(.red)
-                            .background(Color.clear)
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(Color.red, lineWidth: 1.0)
-                            )
-                            .clipShape(Capsule())
+                    Group {
+                        if isApplied {
+                            Text(SecretKeys.textRestorePatch)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.red)
+                        } else {
+                            Text(SecretKeys.textMaintenance)
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .foregroundStyle(.red)
+                                .background(Color.clear)
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(Color.red, lineWidth: 1.0)
+                                )
+                                .clipShape(Capsule())
+                        }
                     }
+                    .transaction { $0.animation = nil }
                 } else if isApplied {
                     Text(SecretKeys.textActiveState)
                         .font(.subheadline.bold())
@@ -282,6 +285,7 @@ struct QuickApplyView: View {
             .padding(.vertical, 10)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
+            .animation(.easeInOut(duration: 0.25), value: isApplied)
             .animation(.easeInOut(duration: 0.25), value: viewModel.isMultiSelectMode)
         }
         .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
