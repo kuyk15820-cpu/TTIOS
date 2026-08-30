@@ -16,7 +16,7 @@ class AppUpdateCheckerManager: ObservableObject {
     @Published var isUpdateNeeded: Bool = false
     @Published var downloadUrl: String?
     @Published var releaseNotes: String?
-    @Published var serverVersion: String = "1.0.0"
+    @Published var serverVersion: String = SecretKeys.fallbackVersion
     
     // MARK: - Download States
     @Published var isDownloading = false
@@ -47,13 +47,13 @@ class AppUpdateCheckerManager: ObservableObject {
             self.updateHandler = customHandler
         }
         
-        guard let url = URL(string: "https://f1x3r.org/pv/app_version.php") else { return }
+        guard let url = URL(string: SecretKeys.appUpdateURL) else { return }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 10.0
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue(SecretKeys.userAgentValue, forHTTPHeaderField: SecretKeys.userAgentHeader)
         
         // 🟢 ใช้ urlSession ที่ผูก Delegate สำหรับ SSL Pinning
         urlSession.dataTask(with: request) { [weak self] data, response, error in
@@ -67,20 +67,20 @@ class AppUpdateCheckerManager: ObservableObject {
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else { return }
             
-            let currentBundleID = Bundle.main.bundleIdentifier ?? "N/A"
-            let currentAppName = (Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String)
-                                ?? (Bundle.main.infoDictionary?["CFBundleName"] as? String) ?? "N/A"
-            let currentVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "N/A"
+            let currentBundleID = Bundle.main.bundleIdentifier ?? SecretKeys.fallbackNA
+            let currentAppName = (Bundle.main.infoDictionary?[SecretKeys.infoCFBundleDisplayName] as? String)
+                                ?? (Bundle.main.infoDictionary?[SecretKeys.infoCFBundleName] as? String) ?? SecretKeys.fallbackNA
+            let currentVersion = (Bundle.main.infoDictionary?[SecretKeys.infoCFBundleShortVersionString] as? String) ?? SecretKeys.fallbackNA
             
-            let serverBundleID = json["bundleID"] as? String ?? "N/A"
-            let serverAppName = json["appName"] as? String ?? "N/A"
-            let serverVersion = json["latestVersion"] as? String ?? "1.0.0"
-            let allowedVersions = json["allowedVersions"] as? [String] ?? []
-            let downloadUrl = json["downloadUrl"] as? String
-            let releaseNotes = json["releaseNotes"] as? String
+            let serverBundleID = json[SecretKeys.jsonKeyBundleID] as? String ?? SecretKeys.fallbackNA
+            let serverAppName = json[SecretKeys.jsonKeyAppName] as? String ?? SecretKeys.fallbackNA
+            let serverVersion = json[SecretKeys.jsonKeyLatestVersion] as? String ?? SecretKeys.fallbackVersion
+            let allowedVersions = json[SecretKeys.jsonKeyAllowedVersions] as? [String] ?? []
+            let downloadUrl = json[SecretKeys.jsonKeyDownloadUrl] as? String
+            let releaseNotes = json[SecretKeys.jsonKeyReleaseNotes] as? String
             
             let isBundleValid = (currentBundleID == serverBundleID)
-            let isAppNameValid = (currentAppName == "N/A") ? true : (currentAppName == serverAppName)
+            let isAppNameValid = (currentAppName == SecretKeys.fallbackNA) ? true : (currentAppName == serverAppName)
             let isVersionAllowed = allowedVersions.contains(currentVersion)
             
             let needsUpdate = !isBundleValid || !isAppNameValid || !isVersionAllowed
@@ -103,7 +103,7 @@ class AppUpdateCheckerManager: ObservableObject {
                                                   appropriateFor: nil,
                                                   create: true)
         
-        let downloadURL = appSupportURL.appendingPathComponent(".download", isDirectory: true)
+        let downloadURL = appSupportURL.appendingPathComponent(SecretKeys.downloadDirectory, isDirectory: true)
         if !fileManager.fileExists(atPath: downloadURL.path) {
             try fileManager.createDirectory(at: downloadURL, withIntermediateDirectories: true, attributes: nil)
         }
@@ -133,7 +133,7 @@ class AppUpdateCheckerManager: ObservableObject {
             self.downloadProgress = 0.0
             self.totalBytesWritten = 0
             self.totalBytesExpected = 0
-            self.downloadSizeText = "Downloading... (0%)"
+            self.downloadSizeText = SecretKeys.downloadProgressFormatZero
             self.currentDownloadFileURL = nil
         }
         
@@ -141,16 +141,16 @@ class AppUpdateCheckerManager: ObservableObject {
         
         downloadTask = urlSession.downloadTask(with: url)
         
-        NotificationCenter.default.removeObserver(self, name: Notification.Name("URLSessionDownloadProgress"), object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(downloadProgressChanged), name: Notification.Name("URLSessionDownloadProgress"), object: nil)
+        NotificationCenter.default.removeObserver(self, name: Notification.Name(SecretKeys.downloadProgressNotification), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(downloadProgressChanged), name: Notification.Name(SecretKeys.downloadProgressNotification), object: nil)
         
         downloadTask?.resume()
     }
     
     @objc private func downloadProgressChanged(notification: Notification) {
         guard let userInfo = notification.userInfo,
-              let written = userInfo["written"] as? Int64,
-              let expected = userInfo["expected"] as? Int64 else { return }
+              let written = userInfo[SecretKeys.dictKeyWritten] as? Int64,
+              let expected = userInfo[SecretKeys.dictKeyExpected] as? Int64 else { return }
         
         let sizeText: String
         let progress: Double
@@ -161,7 +161,7 @@ class AppUpdateCheckerManager: ObservableObject {
             sizeText = "Downloading... (\(percentage)%)"
         } else {
             progress = 0.0
-            sizeText = "Downloading..."
+            sizeText = SecretKeys.updateBtnDownloadingDefault
         }
         
         DispatchQueue.main.async {
@@ -190,7 +190,7 @@ class AppUpdateCheckerManager: ObservableObject {
         do {
             let fileManager = FileManager.default
             let downloadDir = try getDownloadDirectoryURL()
-            let suggestedFilename = response?.suggestedFilename ?? "app.ipa"
+            let suggestedFilename = response?.suggestedFilename ?? SecretKeys.defaultIPAFilename
             let finalFileURL = downloadDir.appendingPathComponent(suggestedFilename)
             
             if fileManager.fileExists(atPath: finalFileURL.path) {
@@ -202,7 +202,7 @@ class AppUpdateCheckerManager: ObservableObject {
             // 💡 1. ค้าง 100% ให้ผู้ใช้เห็นก่อน 0.5 วินาที
             DispatchQueue.main.async {
                 self.downloadProgress = 1.0
-                self.downloadSizeText = "Downloading... (100%)"
+                self.downloadSizeText = SecretKeys.downloadProgressFormatHundred
             }
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -299,13 +299,13 @@ class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         let userInfo: [String: Any] = [
-            "written": totalBytesWritten,
-            "expected": totalBytesExpectedToWrite
+            SecretKeys.dictKeyWritten: totalBytesWritten,
+            SecretKeys.dictKeyExpected: totalBytesExpectedToWrite
         ]
         
         DispatchQueue.main.async {
             NotificationCenter.default.post(
-                name: Notification.Name("URLSessionDownloadProgress"),
+                name: Notification.Name(SecretKeys.downloadProgressNotification),
                 object: downloadTask,
                 userInfo: userInfo
             )
