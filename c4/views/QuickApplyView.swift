@@ -198,7 +198,6 @@ struct QuickApplyView: View {
         let isSelected = viewModel.selectedItems.contains(item.id)
         let isServerActive = item.active ?? true
         let isDisabled = viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch
-        let isRowProcessing = viewModel.processingItemID == item.id || (viewModel.isRestoringAll && isApplied) || (viewModel.isProcessingBatch && isSelected)
 
         Button {
             guard !isDisabled else { return }
@@ -251,8 +250,9 @@ struct QuickApplyView: View {
 
                 Spacer(minLength: 4)
 
-                if isRowProcessing {
+                if viewModel.processingItemID == item.id {
                     ActivityIndicator(isAnimating: true, style: .medium)
+                        .transition(.opacity)
                 } else if !isServerActive {
                     if isApplied {
                         Text(SecretKeys.textRestorePatch)
@@ -275,6 +275,7 @@ struct QuickApplyView: View {
                     Text(SecretKeys.textActiveState)
                         .font(.subheadline.bold())
                         .foregroundStyle(.green)
+                        .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 16)
