@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-26
+    runs-on: macos-14
 
     steps:
       - name: checkout
@@ -27,6 +27,15 @@ jobs:
 
       - name: show xcode version
         run: xcodebuild -version
+
+      # 🟢 โหลด Hikari LLVM Toolchain และย้ายไปไว้ที่ ~/Library/Developer/Toolchains
+      - name: setup hikari llvm toolchain
+        run: |
+          mkdir -p ~/Library/Developer/Toolchains
+          git clone --depth=1 https://github.com/Hikari-LLVM/Hikari.git /tmp/HikariToolchain || true
+          if [ -d "/tmp/HikariToolchain/Hikari.xctoolchain" ]; then
+            mv /tmp/HikariToolchain/Hikari.xctoolchain ~/Library/Developer/Toolchains/
+          fi
 
       - name: install ldid & swiftsecretkeys
         run: |
