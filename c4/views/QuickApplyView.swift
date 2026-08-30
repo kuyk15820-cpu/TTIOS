@@ -69,9 +69,6 @@ struct QuickApplyView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
 
-    @State private var showSettings = false
-    @State private var showLogs = false
-
     init(selectedApp: TargetGameApp) {
         _viewModel = StateObject(wrappedValue: QuickApplyViewModel(selectedApp: selectedApp))
     }
@@ -88,13 +85,7 @@ struct QuickApplyView: View {
             }
 
             // Main Content Area
-            if viewModel.isLoadingCatalog {
-                VStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                }
-            } else if viewModel.displayedPatches.isEmpty {
+            if viewModel.displayedPatches.isEmpty && !viewModel.isLoadingCatalog {
                 VStack(spacing: 12) {
                     Image(systemName: SecretKeys.iconEmptyState)
                         .font(.system(size: 40))
@@ -161,6 +152,7 @@ struct QuickApplyView: View {
         .navigationBarTitleDisplayMode(.large)
         .tint(AppTheme.accent)
         .toolbar {
+            // เหลือ Toolbar เฉพาะปุ่ม Refresh เพียงอย่างเดียว
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     Task {
@@ -172,24 +164,10 @@ struct QuickApplyView: View {
                 .disabled(viewModel.isLoadingCatalog || viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch)
                 .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
             }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showLogs = true } label: {
-                    Image(systemName: SecretKeys.iconTerminal)
-                }
-                .accessibilityLabel(SecretKeys.textAccessibilityLogs)
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showSettings = true } label: {
-                    Image(systemName: SecretKeys.iconSettings)
-                }
-                .accessibilityLabel(SecretKeys.textAccessibilitySettings)
-            }
         }
         .task {
             await viewModel.fetchCatalog()
         }
-        .sheet(isPresented: $showSettings) { SettingsView() }
-        .sheet(isPresented: $showLogs) { LogView() }
     }
 
     // MARK: - Patch Row Component
@@ -201,9 +179,11 @@ struct QuickApplyView: View {
         let isServerActive = item.active ?? true
         let isDisabled = viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch
         
-        let isRowProcessing = viewModel.processingItemID == item.id 
-            || (viewModel.isRestoringAll && isApplied) 
+        // 🔴 ปรับเงื่อนไข ActivityIndicator: ไม่แสดงถ้าเป็นการปิด Patch (isApplied == true)
+        let isRowProcessing = !isApplied && (
+            viewModel.processingItemID == item.id 
             || (viewModel.isProcessingBatch && isSelected)
+        )
 
         Button {
             guard !isDisabled else { return }
@@ -222,7 +202,7 @@ struct QuickApplyView: View {
             }
         } label: {
             HStack(alignment: .center, spacing: 10) {
-                // 🟢 คืนอนิเมชั่นสไลด์นุ่มนวลให้ส่วน Checkmark ตอนเปิด/ปิดโหมด Multi-Select
+                // อนิเมชั่นสไลด์สำหรับ Checkmark ในโหมดเลือกหลายรายการ
                 if viewModel.isMultiSelectMode {
                     Image(systemName: isSelected ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
                         .font(.title3)
@@ -257,7 +237,7 @@ struct QuickApplyView: View {
 
                 Spacer(minLength: 4)
 
-                // 🔴 แยกส่วนนี้ให้อัปเดตสถานะ/Spinner ทันทีโดยปิด Animation เฉพาะตรงนี้
+                // ปิด Animation เฉพาะในส่วนของ Indicator และสถานะขวามือ
                 ZStack(alignment: .trailing) {
                     ActivityIndicator(isAnimating: isRowProcessing, style: .medium)
                         .opacity(isRowProcessing ? 1.0 : 0.0)
