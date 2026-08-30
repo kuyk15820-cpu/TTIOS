@@ -34,32 +34,34 @@ struct AppUpdateView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 28) {
                         
-                        // App Icon (Base64 Integration)
+                        // App Icon (Full-bleed Frame)
                         ZStack {
-                            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color(red: 0.25, green: 0.55, blue: 0.98), Color(red: 0.12, green: 0.35, blue: 0.85)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 76, height: 76)
-                                .shadow(color: Color.blue.opacity(0.35), radius: 12, x: 0, y: 6)
-
                             if let icon = AppIconAssets.appIcon {
                                 icon
                                     .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 48, height: 48)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .scaledToFill()
+                                    .frame(width: 76, height: 76)
+                                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                                    .shadow(color: Color.blue.opacity(0.35), radius: 12, x: 0, y: 6)
                             } else {
                                 // Fallback กรณี Base64 ถอดรหัสไม่ได้
-                                Image(systemName: SecretKeys.updateIconGlobe)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 42, height: 42)
-                                    .foregroundColor(.white)
+                                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color(red: 0.25, green: 0.55, blue: 0.98), Color(red: 0.12, green: 0.35, blue: 0.85)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 76, height: 76)
+                                    .shadow(color: Color.blue.opacity(0.35), radius: 12, x: 0, y: 6)
+                                    .overlay(
+                                        Image(systemName: SecretKeys.updateIconGlobe)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 42, height: 42)
+                                            .foregroundColor(.white)
+                                    )
                             }
                         }
 
