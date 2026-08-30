@@ -85,7 +85,12 @@ struct QuickApplyView: View {
             }
 
             // Main Content Area
-            if viewModel.displayedPatches.isEmpty && !viewModel.isLoadingCatalog {
+            if viewModel.isLoadingCatalog {
+                // ขณะรีเฟรชหรือโหลดข้อมูล -> ซ่อน List ทั้งหมด
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.displayedPatches.isEmpty {
+                // โหลดเสร็จแล้วแต่ไม่มีข้อมูล -> แสดง Empty State
                 VStack(spacing: 12) {
                     Image(systemName: SecretKeys.iconEmptyState)
                         .font(.system(size: 40))
@@ -96,6 +101,7 @@ struct QuickApplyView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                // โหลดเสร็จและมีข้อมูล -> แสดง List
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         // Section Header สไตล์ Native List
