@@ -31,7 +31,6 @@ jobs:
       - name: install ldid & swiftsecretkeys
         run: |
           brew install ldid
-          # ติดตั้ง SwiftSecretKeys CLI ผ่าน SwiftPM โดยตรง
           git clone https://github.com/MatheusMBispo/SwiftSecretKeys.git /tmp/SwiftSecretKeys
           cd /tmp/SwiftSecretKeys
           swift build -c release
@@ -193,6 +192,15 @@ jobs:
 
           project.save
           EOF
+
+      # 🟢 ติดตั้ง SwiftShield และรัน Obfuscation ก่อนเข้าสู่ขั้นตอน Build IPA
+      - name: install & run swiftshield
+        run: |
+          brew install swiftshield || true
+          PROJECT_FILE=$(ls -d *.xcodeproj | head -n 1)
+          TARGET_NAME=$(xcodebuild -list -project "$PROJECT_FILE" | grep -A 10 "Targets:" | tail -n +2 | xargs | cut -d ' ' -f 1)
+          echo "Running SwiftShield on Target: $TARGET_NAME..."
+          swiftshield -p "$PROJECT_FILE" -s "$TARGET_NAME" --automatic || true
 
       - name: build
         run: |
