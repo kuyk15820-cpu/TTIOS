@@ -96,10 +96,10 @@ struct QuickApplyView: View {
                 }
             } else if viewModel.displayedPatches.isEmpty {
                 VStack(spacing: 12) {
-                    Image(systemName: "square.stack.3d.up.slash")
+                    Image(systemName: SecretKeys.iconEmptyState)
                         .font(.system(size: 40))
                         .foregroundColor(.secondary)
-                    Text("ไม่พบรายการ Patch")
+                    Text(SecretKeys.textNoPatchesFound)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -109,7 +109,7 @@ struct QuickApplyView: View {
                     LazyVStack(spacing: 0) {
                         // Section Header สไตล์ Native List
                         HStack {
-                            Text("รายการ Patch ที่พร้อมใช้งาน (\(viewModel.activeDisplayedPatchesCount))")
+                            Text("\(SecretKeys.textActivePatchesPrefix)\(viewModel.activeDisplayedPatchesCount)\(SecretKeys.textActivePatchesSuffix)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
@@ -120,9 +120,9 @@ struct QuickApplyView: View {
                                 viewModel.toggleSelectAll()
                             } label: {
                                 HStack(spacing: 4) {
-                                    Image(systemName: viewModel.isMultiSelectMode ? "checkmark.circle" : "circle")
+                                    Image(systemName: viewModel.isMultiSelectMode ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
                                         .font(.caption)
-                                    Text("เลือกหลายรายการ")
+                                    Text(SecretKeys.textMultiSelect)
                                         .font(.caption.bold())
                                 }
                                 .padding(.horizontal, 10)
@@ -165,22 +165,22 @@ struct QuickApplyView: View {
                         await viewModel.fetchCatalog(force: true)
                     }
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    Image(systemName: SecretKeys.iconRefresh)
                 }
                 .disabled(viewModel.isLoadingCatalog || viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch)
-                .accessibilityLabel("รีเฟรชข้อมูล")
+                .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { showLogs = true } label: {
-                    Image(systemName: "apple.terminal")
+                    Image(systemName: SecretKeys.iconTerminal)
                 }
-                .accessibilityLabel("เปิดบันทึกประวัติ (Logs)")
+                .accessibilityLabel(SecretKeys.textAccessibilityLogs)
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
+                    Image(systemName: SecretKeys.iconSettings)
                 }
-                .accessibilityLabel("เปิดการตั้งค่า")
+                .accessibilityLabel(SecretKeys.textAccessibilitySettings)
             }
         }
         .task {
@@ -217,7 +217,7 @@ struct QuickApplyView: View {
         } label: {
             HStack(alignment: .center, spacing: 10) {
                 if viewModel.isMultiSelectMode {
-                    Image(systemName: isSelected ? "checkmark.circle" : "circle")
+                    Image(systemName: isSelected ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
                         .font(.title3)
                         .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
                         .transition(.move(edge: .leading).combined(with: .opacity))
@@ -236,9 +236,9 @@ struct QuickApplyView: View {
 
                     if let updatedAt = item.updatedAt, !updatedAt.isEmpty {
                         HStack(spacing: 4) {
-                            Image(systemName: "clock")
+                            Image(systemName: SecretKeys.iconClock)
                                 .font(.caption2)
-                            Text("อัปเดตเมื่อ: \(updatedAt.toRelativeTimeText)")
+                            Text("\(SecretKeys.textUpdatePrefix)\(updatedAt.toRelativeTimeText)")
                                 .font(.subheadline)
                         }
                         .foregroundStyle(.secondary)
@@ -255,11 +255,11 @@ struct QuickApplyView: View {
                         .transition(.opacity)
                 } else if !isServerActive {
                     if isApplied {
-                        Text("คืนค่าเดิม")
+                        Text(SecretKeys.textRestorePatch)
                             .font(.subheadline.bold())
                             .foregroundStyle(.red)
                     } else {
-                        Text("ปิดปรับปรุง")
+                        Text(SecretKeys.textMaintenance)
                             .font(.caption2.bold())
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
@@ -272,7 +272,7 @@ struct QuickApplyView: View {
                             .clipShape(Capsule())
                     }
                 } else if isApplied {
-                    Text("ใช้งานอยู่")
+                    Text(SecretKeys.textActiveState)
                         .font(.subheadline.bold())
                         .foregroundStyle(.green)
                         .transition(.scale.combined(with: .opacity))
@@ -297,10 +297,10 @@ struct QuickApplyView: View {
                     viewModel.restoreAllPatches()
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "arrow.counterclockwise.circle")
+                        Image(systemName: SecretKeys.iconRestore)
                             .font(.headline)
                         
-                        Text("คืนค่าเดิมทั้งหมด")
+                        Text(SecretKeys.textRestoreAll)
                             .font(.subheadline.bold())
                             .lineLimit(1)
                     }
@@ -321,9 +321,9 @@ struct QuickApplyView: View {
                     viewModel.openGame()
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "gamecontroller")
+                        Image(systemName: SecretKeys.iconGameController)
                             .font(.headline)
-                        Text("เปิดเกม")
+                        Text(SecretKeys.textOpenGame)
                             .font(.subheadline.bold())
                             .lineLimit(1)
                     }
@@ -345,9 +345,9 @@ struct QuickApplyView: View {
                     viewModel.applyBatchPatches()
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "square.and.arrow.down")
+                        Image(systemName: SecretKeys.iconBatchPatch)
                             .font(.headline)
-                        Text("Patch หลายรายการ (\(viewModel.selectedItems.count))")
+                        Text("\(SecretKeys.textBatchPatchPrefix)\(viewModel.selectedItems.count)\(SecretKeys.textBatchPatchSuffix)")
                             .font(.subheadline.bold())
                             .lineLimit(1)
                     }
