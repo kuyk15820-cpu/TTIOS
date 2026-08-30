@@ -9,7 +9,7 @@ class QuickApplyViewModel: ObservableObject {
     @Published var patchItems: [QuickPatchItem] = []
     @Published var activePatches: [String: Bool] = [:]
     @Published var selectedItems: Set<String> = []
-    @Published var selectedCategory: String = "ทั้งหมด"
+    @Published var selectedCategory: String = SecretKeys.categoryAll
     @Published var isMultiSelectMode = false
 
     @Published var isLoadingCatalog = false
@@ -34,7 +34,7 @@ class QuickApplyViewModel: ObservableObject {
     }
 
     var availableCategories: [String] {
-        var categories = ["ทั้งหมด"]
+        var categories = [SecretKeys.categoryAll]
         let rawCategories = filteredGamePatches.compactMap { $0.category?.trimmingCharacters(in: .whitespacesAndNewlines) }
         
         for cat in rawCategories where !cat.isEmpty {
@@ -46,7 +46,7 @@ class QuickApplyViewModel: ObservableObject {
     }
 
     var displayedPatches: [QuickPatchItem] {
-        if selectedCategory == "ทั้งหมด" {
+        if selectedCategory == SecretKeys.categoryAll {
             return filteredGamePatches
         }
         return filteredGamePatches.filter {
@@ -67,7 +67,7 @@ class QuickApplyViewModel: ObservableObject {
     }
 
     func countForCategory(_ category: String) -> Int? {
-        if category == "ทั้งหมด" {
+        if category == SecretKeys.categoryAll {
             return filteredGamePatches.count
         }
         return filteredGamePatches.filter {
@@ -100,27 +100,27 @@ class QuickApplyViewModel: ObservableObject {
     func openGame() {
         let success = AppLauncher.launchApp(bundleID: selectedApp.bundleID)
         if !success {
-            showErrorNotification(message: "ไม่สามารถเปิดแอปพลิเคชัน \(selectedApp.name) ได้")
+            showErrorNotification(message: "\(SecretKeys.msgLaunchAppFailedPrefix)\(selectedApp.name)\(SecretKeys.msgLaunchAppFailedSuffix)")
         }
     }
 
     // MARK: - Notifications
     func showSuccessNotification(message: String) {
-        let icon = UIImage(systemName: "checkmark.circle")?.withTintColor(.white, renderingMode: .alwaysOriginal)
+        let icon = UIImage(systemName: SecretKeys.iconCheckmarkCircle)?.withTintColor(.white, renderingMode: .alwaysOriginal)
         FTNotificationIndicator.setNotificationIndicatorStyle(.dark)
         FTNotificationIndicator.showNotification(
             with: icon,
-            title: "สำเร็จ",
+            title: SecretKeys.titleSuccess,
             message: message
         )
     }
 
     func showErrorNotification(message: String) {
-        let icon = UIImage(systemName: "exclamationmark.triangle")?.withTintColor(.white, renderingMode: .alwaysOriginal)
+        let icon = UIImage(systemName: SecretKeys.iconWarningTriangle)?.withTintColor(.white, renderingMode: .alwaysOriginal)
         FTNotificationIndicator.setNotificationIndicatorStyle(.dark)
         FTNotificationIndicator.showNotification(
             with: icon,
-            title: "ล้มเหลว",
+            title: SecretKeys.titleFailed,
             message: message
         )
     }
@@ -134,8 +134,8 @@ class QuickApplyViewModel: ObservableObject {
             create: true
         ) else { return nil }
 
-        let targetDirectory = appSupportURL.appendingPathComponent(".c4", isDirectory: true)
-        return targetDirectory.appendingPathComponent("\(id).c4")
+        let targetDirectory = appSupportURL.appendingPathComponent(SecretKeys.c4Directory, isDirectory: true)
+        return targetDirectory.appendingPathComponent("\(id)\(SecretKeys.c4Extension)")
     }
 
     private func downloadFile(from urlString: String, to destinationURL: URL) async throws {
@@ -155,7 +155,7 @@ class QuickApplyViewModel: ObservableObject {
             cachePolicy: .reloadIgnoringLocalCacheData,
             timeoutInterval: 30
         )
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue(SecretKeys.userAgentValue, forHTTPHeaderField: SecretKeys.userAgentHeader)
 
         // 🟢 ใช้ URLSession.pinned ที่ผูก SSL Pinning Delegate ไว้แล้ว
         let (tempURL, response) = try await URLSession.pinned.download(for: request)
@@ -185,7 +185,7 @@ class QuickApplyViewModel: ObservableObject {
                 timeoutInterval: 15
             )
             request.httpMethod = "GET"
-            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+            request.setValue(SecretKeys.userAgentValue, forHTTPHeaderField: SecretKeys.userAgentHeader)
 
             // 🟢 ใช้ URLSession.pinned ที่ผูก SSL Pinning Delegate ไว้แล้ว
             let (data, response) = try await URLSession.pinned.data(for: request)
@@ -225,22 +225,22 @@ class QuickApplyViewModel: ObservableObject {
 
     private nonisolated func translatePatchError(_ error: PatchPackageError) -> String {
         switch error.localizationKey {
-        case "patch.error.invalid_project":
-            return "โปรดตรวจสอบชื่อโปรเจกต์, Bundle เป้าหมาย และเนื้อหาใน Workspace"
-        case "patch.error.app_unavailable":
-            return "ไม่พบหรือไม่สามารถเปิดแอป Bundle \(selectedApp.bundleID) ได้"
-        case "patch.error.apply":
-            return "ไม่สามารถใช้งาน Patch ได้ ระบบได้ทำการย้อนคืนการเขียนไฟล์ก่อนหน้าทั้งหมดแล้ว"
-        case "patch.error.duplicate_target":
-            return "มีเงื่อนไข (Rules) ซ้ำซ้อนที่ชี้ไปที่ไฟล์แอปเดียวกัน"
-        case "patch.error.invalid_bundle":
-            return "โปรดระบุ App Bundle Identifier ที่ถูกต้อง ไม่ใช่ Container UUID"
-        case "patch.error.password_or_corrupt":
-            return "รหัสผ่านไม่ถูกต้อง หรือไฟล์ Package ถูกดัดแปลง/เสียหาย"
-        case "patch.error.restore":
-            return "ไม่สามารถคืนค่าไฟล์ต้นฉบับได้อย่างปลอดภัย ไม่มีเป้าหมายที่ไม่ได้รับการยืนยันถูกเขียนทับ"
-        case "patch.error.size_limit":
-            return "ไฟล์ Package หรือไฟล์ที่นำมาแทนที่ มีขนาดเกินขีดจำกัดที่รองรับ"
+        case SecretKeys.errKeyInvalidProject:
+            return SecretKeys.errMsgInvalidProject
+        case SecretKeys.errKeyAppUnavailable:
+            return "\(SecretKeys.errMsgAppUnavailablePrefix)\(selectedApp.bundleID)\(SecretKeys.errMsgAppUnavailableSuffix)"
+        case SecretKeys.errKeyApply:
+            return SecretKeys.errMsgApply
+        case SecretKeys.errKeyDuplicateTarget:
+            return SecretKeys.errMsgDuplicateTarget
+        case SecretKeys.errKeyInvalidBundle:
+            return SecretKeys.errMsgInvalidBundle
+        case SecretKeys.errKeyPasswordOrCorrupt:
+            return SecretKeys.errMsgPasswordOrCorrupt
+        case SecretKeys.errKeyRestore:
+            return SecretKeys.errMsgRestore
+        case SecretKeys.errKeySizeLimit:
+            return SecretKeys.errMsgSizeLimit
         default:
             return error.localizationKey
         }
@@ -292,7 +292,7 @@ class QuickApplyViewModel: ObservableObject {
                     await MainActor.run {
                         self.activePatches[item.id] = true
                         self.processingItemID = nil
-                        self.showSuccessNotification(message: "ติดตั้ง Patch เรียบร้อยแล้ว")
+                        self.showSuccessNotification(message: SecretKeys.msgPatchAppliedSuccess)
                     }
 
                 } else {
@@ -308,7 +308,7 @@ class QuickApplyViewModel: ObservableObject {
                     await MainActor.run {
                         self.activePatches[item.id] = false
                         self.processingItemID = nil
-                        self.showSuccessNotification(message: "คืนค่า Patch ต้นฉบับเรียบร้อยแล้ว")
+                        self.showSuccessNotification(message: SecretKeys.msgPatchRestoredSuccess)
                     }
                 }
             } catch let error as PatchPackageError {
@@ -320,7 +320,7 @@ class QuickApplyViewModel: ObservableObject {
             } catch {
                 await MainActor.run {
                     self.processingItemID = nil
-                    let message = enable ? "ไม่สามารถใช้งาน Patch ได้ ระบบได้ทำการยกเลิกการเขียนไฟล์ก่อนหน้าทั้งหมดแล้ว" : "ไม่สามารถคืนค่าไฟล์ต้นฉบับได้"
+                    let message = enable ? SecretKeys.msgPatchApplyFailed : SecretKeys.msgPatchRestoreFailed
                     self.showErrorNotification(message: message)
                 }
             }
@@ -387,9 +387,9 @@ class QuickApplyViewModel: ObservableObject {
                 self.selectedItems.removeAll()
                 self.isMultiSelectMode = false
                 if finalSuccessCount > 0 {
-                    self.showSuccessNotification(message: "ติดตั้ง Patch (\(finalSuccessCount) รายการ) เรียบร้อยแล้ว")
+                    self.showSuccessNotification(message: "\(SecretKeys.msgBatchAppliedSuccessPrefix)\(finalSuccessCount)\(SecretKeys.msgBatchAppliedSuccessSuffix)")
                 } else {
-                    self.showErrorNotification(message: "ไม่สามารถติดตั้ง Patch ที่เลือกได้")
+                    self.showErrorNotification(message: SecretKeys.msgBatchAppliedFailed)
                 }
             }
         }
@@ -427,9 +427,9 @@ class QuickApplyViewModel: ObservableObject {
                 self.selectedItems.removeAll()
                 self.isMultiSelectMode = false
                 if finalCount > 0 {
-                    self.showSuccessNotification(message: "คืนค่า Patch ต้นฉบับเรียบร้อยแล้ว")
+                    self.showSuccessNotification(message: SecretKeys.msgPatchRestoredSuccess)
                 } else {
-                    self.showSuccessNotification(message: "รีเซ็ตสถานะคืนค่าเดิมทั้งหมดเรียบร้อยแล้ว")
+                    self.showSuccessNotification(message: SecretKeys.msgRestoreAllResetSuccess)
                 }
             }
         }
