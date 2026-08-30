@@ -190,7 +190,7 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Patch Row Component
+    // MARK: - Patch Row Component (Animation-Free)
 
     @ViewBuilder
     private func patchRow(for item: QuickPatchItem) -> some View {
@@ -198,6 +198,10 @@ struct QuickApplyView: View {
         let isSelected = viewModel.selectedItems.contains(item.id)
         let isServerActive = item.active ?? true
         let isDisabled = viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch
+        
+        let isRowProcessing = viewModel.processingItemID == item.id 
+            || (viewModel.isRestoringAll && isApplied) 
+            || (viewModel.isProcessingBatch && isSelected)
 
         Button {
             guard !isDisabled else { return }
@@ -220,7 +224,6 @@ struct QuickApplyView: View {
                     Image(systemName: isSelected ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
                         .font(.title3)
                         .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
-                        .transition(.move(edge: .leading).combined(with: .opacity))
                         .onTapGesture {
                             guard !isDisabled && isServerActive else { return }
                             viewModel.toggleSelection(for: item)
@@ -250,42 +253,50 @@ struct QuickApplyView: View {
 
                 Spacer(minLength: 4)
 
-                if viewModel.processingItemID == item.id {
-                    ActivityIndicator(isAnimating: true, style: .medium)
-                        .transition(.opacity)
-                } else if !isServerActive {
-                    if isApplied {
-                        Text(SecretKeys.textRestorePatch)
-                            .font(.subheadline.bold())
-                            .foregroundStyle(.red)
-                    } else {
-                        Text(SecretKeys.textMaintenance)
-                            .font(.caption2.bold())
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .foregroundStyle(.red)
-                            .background(Color.clear)
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(Color.red, lineWidth: 1.0)
-                            )
-                            .clipShape(Capsule())
+                // สลับการแสดงผลด้วย Opacity ใน ZStack เพื่อกำจัด Cross-Dissolve Animation เวลาเปลี่ยนสถานะ
+                ZStack(alignment: .trailing) {
+                    ActivityIndicator(isAnimating: isRowProcessing, style: .medium)
+                        .opacity(isRowProcessing ? 1.0 : 0.0)
+
+                    Group {
+                        if !isServerActive {
+                            if isApplied {
+                                Text(SecretKeys.textRestorePatch)
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(.red)
+                            } else {
+                                Text(SecretKeys.textMaintenance)
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .foregroundStyle(.red)
+                                    .background(Color.clear)
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(Color.red, lineWidth: 1.0)
+                                    )
+                                    .clipShape(Capsule())
+                            }
+                        } else if isApplied {
+                            Text(SecretKeys.textActiveState)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.green)
+                        }
                     }
-                } else if isApplied {
-                    Text(SecretKeys.textActiveState)
-                        .font(.subheadline.bold())
-                        .foregroundStyle(.green)
-                        .transition(.scale.combined(with: .opacity))
+                    .opacity(isRowProcessing ? 0.0 : 1.0)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
-            .animation(.easeInOut(duration: 0.25), value: viewModel.isMultiSelectMode)
         }
         .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
         .disabled(isDisabled || (!isServerActive && !isApplied))
+        .transaction { transaction in
+            // บังคับปิดอนิเมชั่นทั้งหมดในระดับ Row โดยตรง
+            transaction.animation = nil
+        }
     }
 
     // MARK: - Bottom Action Buttons
@@ -362,10 +373,8 @@ struct QuickApplyView: View {
                     .clipShape(Capsule())
                 }
                 .disabled(viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch || viewModel.isLoadingCatalog)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: viewModel.selectedItems.isEmpty)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color(.systemBackground))
