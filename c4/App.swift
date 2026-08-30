@@ -98,10 +98,6 @@ struct ThreeOneOSFiveApp: App {
         
         AppUpdateCheckerManager.shared.checkVersion { needsUpdate, downloadUrl, releaseNotes, serverVersion in
             Task { @MainActor in
-                if serverVersion.isEmpty && !needsUpdate && downloadUrl == nil {
-                    return 
-                }
-
                 let elapsedTime = Date().timeIntervalSince(startTime)
                 let minDuration: TimeInterval = 1.0
                 
@@ -112,9 +108,15 @@ struct ThreeOneOSFiveApp: App {
                 
                 self.networkMonitor.cancel()
                 
-                // ปิด Splash Screen เพื่อสลับเข้าหน้าหลัก (TargetGameView จะสลับรายการแอปตาม isUpdateNeeded เอง)
+                // ตรวจสอบว่าต้องแสดง Onboarding หรือไม่
+                let needsOnboarding = !OnboardingStore.isCompleted
+                
+                // ปิด Splash Screen สลับเข้าหน้าหลัก
                 withAnimation(.easeOut(duration: 0.3)) {
                     self.isCheckingUpdate = false
+                    if needsOnboarding {
+                        self.showOnboarding = true
+                    }
                 }
             }
         }
