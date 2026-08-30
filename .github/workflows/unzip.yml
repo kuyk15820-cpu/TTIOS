@@ -28,18 +28,10 @@ jobs:
       - name: show xcode version
         run: xcodebuild -version
 
-      # 🟢 โหลด Hikari LLVM Toolchain จาก Release Zip โดยตรง
-      - name: setup hikari llvm toolchain
-        run: |
-          mkdir -p ~/Library/Developer/Toolchains
-          curl -L -o /tmp/Hikari.xctoolchain.zip https://github.com/Hikari-LLVM/Hikari/releases/download/15.0.0/Hikari_macOS.xctoolchain.zip || true
-          if [ -f "/tmp/Hikari.xctoolchain.zip" ]; then
-            unzip -q /tmp/Hikari.xctoolchain.zip -d ~/Library/Developer/Toolchains/
-          fi
-
       - name: install ldid & swiftsecretkeys
         run: |
           brew install ldid
+          # ติดตั้ง SwiftSecretKeys CLI ผ่าน SwiftPM โดยตรง
           git clone https://github.com/MatheusMBispo/SwiftSecretKeys.git /tmp/SwiftSecretKeys
           cd /tmp/SwiftSecretKeys
           swift build -c release
