@@ -28,18 +28,12 @@ keys:
   dictKeyExpected: "expected"
 
   # JSON Keys for App Update Check
-  jsonKeyVersion: "version"
-  jsonKeyNeedsUpdate: "needsUpdate"
   jsonKeyBundleID: "bundleID"
   jsonKeyAppName: "appName"
   jsonKeyLatestVersion: "latestVersion"
   jsonKeyAllowedVersions: "allowedVersions"
   jsonKeyDownloadUrl: "downloadUrl"
   jsonKeyReleaseNotes: "releaseNotes"
-  
-  # App Security & Secret Validation
-  appSecretID: "1.0.0"
-  jsonKeySecretID: "secret_id"
 
   # Info.plist Keys & Fallback Values
   infoCFBundleDisplayName: "CFBundleDisplayName"
