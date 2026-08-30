@@ -26,7 +26,7 @@ extension String {
         let safeDate = min(date, now)
         
         let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "th_TH@calendar=gregorian")
+        formatter.locale = Locale(identifier: SecretKeys.localeThaiGregorian)
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateTimeStyle = .named
         formatter.unitsStyle = .full
@@ -47,9 +47,9 @@ struct QuickPatchItem: Identifiable, Codable {
     
     var isAimCategory: Bool {
         if let cat = category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !cat.isEmpty {
-            return cat == "aim"
+            return cat == SecretKeys.categoryAim
         }
         let text = "\(id) \(title)".lowercased()
-        return text.contains("aim") || text.contains("ลาก") || text.contains("หัว")
+        return text.contains(SecretKeys.searchKeyAim) || text.contains(SecretKeys.searchKeyDrag) || text.contains(SecretKeys.searchKeyHead)
     }
 }
