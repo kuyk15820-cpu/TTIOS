@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import SwiftUI
+import TrustKit
 
 // MARK: - AppUpdateCheckerManager
 class AppUpdateCheckerManager: ObservableObject {
@@ -54,11 +55,12 @@ class AppUpdateCheckerManager: ObservableObject {
         request.timeoutInterval = 10.0
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
         
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        // 🟢 ใช้ urlSession ที่ผูก Delegate สำหรับ SSL Pinning
+        urlSession.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
             
             if let error = error {
-                print("⚠️ [HTTP Error]: \(error.localizedDescription)")
+                print("⚠️ [HTTP Error / SSL Blocked]: \(error.localizedDescription)")
                 return
             }
             
@@ -279,9 +281,22 @@ class AppUpdateCheckerManager: ObservableObject {
     }
 }
 
-// MARK: - Helper Extension (URLSessionDownloadDelegate)
+// MARK: - Helper Extension (URLSessionDownloadDelegate & SSL Pinning)
 class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
     static let shared = DownloadProgressDelegate()
+    
+    // 🟢 ส่ง Authentication Challenge ไปให้ TrustKit ตรวจสอบ Certificate
+    func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        
+        if let validator = TrustKit.sharedInstance().pinningValidator {
+            let handled = validator.handle(challenge, completionHandler: completionHandler)
+            if handled {
+                return
+            }
+        }
+        
+        completionHandler(.performDefaultHandling, nil)
+    }
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         let userInfo: [String: Any] = [
