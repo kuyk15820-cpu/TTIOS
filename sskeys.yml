@@ -28,6 +28,8 @@ keys:
   dictKeyExpected: "expected"
 
   # JSON Keys for App Update Check
+  jsonKeyVersion: "version"
+  jsonKeyNeedsUpdate: "needsUpdate"
   jsonKeyBundleID: "bundleID"
   jsonKeyAppName: "appName"
   jsonKeyLatestVersion: "latestVersion"
