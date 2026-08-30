@@ -40,9 +40,10 @@ jobs:
       - name: install ldid & swiftsecretkeys
         run: |
           brew install ldid
-          # ติดตั้ง SwiftSecretKeys CLI ผ่าน SwiftPM โดยตรง
+          # ติดตั้ง SwiftSecretKeys CLI โดยระบุ Tag/Commit ที่รองรับ Swift Tools Version ของ Runner
           git clone https://github.com/MatheusMBispo/SwiftSecretKeys.git /tmp/SwiftSecretKeys
           cd /tmp/SwiftSecretKeys
+          git checkout $(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null) || true
           swift build -c release
           sudo cp .build/release/sskeys /usr/local/bin/
 
