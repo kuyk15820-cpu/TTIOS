@@ -18,13 +18,29 @@ SCHEME_NAME="$TARGET_NAME"
 echo "Auto-generating scheme for Target: $SCHEME_NAME..."
 xcodebuild -project "$PROJECT_FILE" -scheme "$SCHEME_NAME" -manageAutomaticSchemes >/dev/null 2>&1 || true
 
-# 1. สั่ง Archive
+# 🟢 กำหนด Toolchain และ Flags สำหรับ Hikari Obfuscation
+# (ถ้าหา Hikari Toolchain ไม่เจอในเครื่อง ให้สลับไปใช้ default toolchain เพื่อไม่ให้ build ล่ม)
+HIKARI_TOOLCHAIN_PATH="$HOME/Library/Developer/Toolchains/Hikari.xctoolchain"
+TOOLCHAIN_ARG=""
+OBFUSCATION_FLAGS=""
+
+if [ -d "$HIKARI_TOOLCHAIN_PATH" ]; then
+  echo "🟢 Hikari Toolchain Detected! Enabling Obfuscation Flags..."
+  TOOLCHAIN_ARG="TOOLCHAINS=com.hikari.llvm"
+  OBFUSCATION_FLAGS="OTHER_CFLAGS=-mllvm -enable-strcry -mllvm -enable-cffobf -mllvm -enable-indbr -mllvm -enable-acdoc OTHER_CPLUSPLUSFLAGS=-mllvm -enable-strcry -mllvm -enable-cffobf -mllvm -enable-indbr -mllvm -enable-acdoc"
+else
+  echo "⚠️ Hikari Toolchain not found, using default Apple Clang..."
+fi
+
+# 1. สั่ง Archive (ใส่ TOOLCHAINS และ Obfuscation Flags เข้าไป)
 xcodebuild \
   -project "$PROJECT_FILE" \
   -scheme "$SCHEME_NAME" \
   -configuration Release \
   -destination 'generic/platform=iOS' \
   -archivePath "$PWD/build/$PROJECT_NAME.xcarchive" \
+  $TOOLCHAIN_ARG \
+  $OBFUSCATION_FLAGS \
   archive \
   CODE_SIGN_IDENTITY="" \
   CODE_SIGNING_REQUIRED=NO \
