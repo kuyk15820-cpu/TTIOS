@@ -1,67 +1,7 @@
 import SwiftUI
 import UIKit
-import Foundation
-import SwiftDate
 
-// MARK: - Native List Row Button Style ( Highlighting Effect )
-
-struct NativeListRowButtonStyle: ButtonStyle {
-    let isDisabled: Bool
-    let isSelected: Bool
-    
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .opacity(configuration.isPressed ? 0.55 : 1.0)
-    }
-}
-
-// MARK: - Relative Date Helpers
-
-extension String {
-    var toRelativeTimeText: String {
-        // 1. บังคับ Parse String ด้วย Calendar gregorian (ค.ศ.) เสมอ
-        // เพื่อไม่ให้ดึง Calendar.current ของเครื่อง (ที่เป็น พ.ศ.) มาคิดซ้ำ
-        let gregorianRegion = Region(calendar: Calendars.gregorian, zone: Zones.current, locale: Locales.thai)
-        
-        guard let date = self.toDate(region: gregorianRegion)?.date else {
-            return self
-        }
-        
-        let now = Date()
-        let safeDate = min(date, now)
-        
-        // 2. ตั้งค่า Formatter บังคับใช้ ค.ศ.
-        let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "th_TH@calendar=gregorian")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateTimeStyle = .named
-        formatter.unitsStyle = .full
-        
-        return formatter.localizedString(for: safeDate, relativeTo: now)
-    }
-}
-
-// MARK: - Models
-
-struct QuickPatchItem: Identifiable, Codable {
-    let id: String
-    let title: String
-    let updatedAt: String?
-    let downloadUrl: String
-    let active: Bool?
-    let category: String?
-    let bundleID: String?
-    
-    var isAimCategory: Bool {
-        if let cat = category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !cat.isEmpty {
-            return cat == "aim"
-        }
-        let text = "\(id) \(title)".lowercased()
-        return text.contains("aim") || text.contains("ลาก") || text.contains("หัว")
-    }
-}
-
-// MARK: - Filter Bar Component
+// MARK: - Filter Bar Components
 
 struct CategoryTabBar: View {
     let categories: [String]
@@ -125,96 +65,36 @@ struct CategoryTabButton: View {
 // MARK: - QuickApplyView
 
 struct QuickApplyView: View {
-    let selectedApp: TargetGameApp
-
+    @StateObject private var viewModel: QuickApplyViewModel
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
 
-    private var catalogURL: URL {
-    return URL(string: SecretKeys.catalogURL)!
-}
-
-    @State private var patchItems: [QuickPatchItem] = []
-    @State private var activePatches: [String: Bool] = [:]
-    @State private var selectedItems: Set<String> = []
-    @State private var selectedCategory: String = "ทั้งหมด"
-    @State private var isMultiSelectMode = false
-
-    @State private var isLoadingCatalog = false
-    @State private var processingItemID: String?
-    @State private var isProcessingBatch = false
-    @State private var isRestoringAll = false
     @State private var showSettings = false
     @State private var showLogs = false
 
-    private var filteredGamePatches: [QuickPatchItem] {
-        patchItems.filter { item in
-            guard let bId = item.bundleID, !bId.isEmpty else { return true }
-            return bId.lowercased() == selectedApp.bundleID.lowercased()
-        }
-    }
-
-    private var availableCategories: [String] {
-        var categories = ["ทั้งหมด"]
-        let rawCategories = filteredGamePatches.compactMap { $0.category?.trimmingCharacters(in: .whitespacesAndNewlines) }
-        
-        for cat in rawCategories where !cat.isEmpty {
-            if !categories.contains(where: { $0.lowercased() == cat.lowercased() }) {
-                categories.append(cat)
-            }
-        }
-        return categories
-    }
-
-    private var displayedPatches: [QuickPatchItem] {
-        if selectedCategory == "ทั้งหมด" {
-            return filteredGamePatches
-        }
-        return filteredGamePatches.filter {
-            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == selectedCategory.lowercased()
-        }
-    }
-
-    private var activeDisplayedPatchesCount: Int {
-        displayedPatches.filter { $0.active ?? true }.count
-    }
-
-    private var hasActivePatches: Bool {
-        activePatches.values.contains(true)
-    }
-
-    private var availableItems: [QuickPatchItem] {
-        filteredGamePatches.filter { $0.active ?? true }
-    }
-
-    private func countForCategory(_ category: String) -> Int? {
-        if category == "ทั้งหมด" {
-            return filteredGamePatches.count
-        }
-        return filteredGamePatches.filter {
-            ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == category.lowercased()
-        }.count
+    init(selectedApp: TargetGameApp) {
+        _viewModel = StateObject(wrappedValue: QuickApplyViewModel(selectedApp: selectedApp))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             // Category Tab Bar
-            if !isLoadingCatalog && availableCategories.count > 1 {
+            if !viewModel.isLoadingCatalog && viewModel.availableCategories.count > 1 {
                 CategoryTabBar(
-                    categories: availableCategories,
-                    selectedCategory: $selectedCategory,
-                    countProvider: { cat in countForCategory(cat) }
+                    categories: viewModel.availableCategories,
+                    selectedCategory: $viewModel.selectedCategory,
+                    countProvider: { cat in viewModel.countForCategory(cat) }
                 )
             }
 
             // Main Content Area
-            if isLoadingCatalog {
+            if viewModel.isLoadingCatalog {
                 VStack {
                     Spacer()
                     ProgressView()
                     Spacer()
                 }
-            } else if displayedPatches.isEmpty {
+            } else if viewModel.displayedPatches.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "square.stack.3d.up.slash")
                         .font(.system(size: 40))
@@ -229,7 +109,7 @@ struct QuickApplyView: View {
                     LazyVStack(spacing: 0) {
                         // Section Header สไตล์ Native List
                         HStack {
-                            Text("รายการ Patch ที่พร้อมใช้งาน (\(activeDisplayedPatchesCount))")
+                            Text("รายการ Patch ที่พร้อมใช้งาน (\(viewModel.activeDisplayedPatchesCount))")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
@@ -237,18 +117,18 @@ struct QuickApplyView: View {
                             
                             // ปุ่มเลือกหลายรายการ
                             Button {
-                                toggleSelectAll()
+                                viewModel.toggleSelectAll()
                             } label: {
                                 HStack(spacing: 4) {
-                                    Image(systemName: isMultiSelectMode ? "checkmark.circle" : "circle")
+                                    Image(systemName: viewModel.isMultiSelectMode ? "checkmark.circle" : "circle")
                                         .font(.caption)
                                     Text("เลือกหลายรายการ")
                                         .font(.caption.bold())
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(isMultiSelectMode ? AppTheme.accent.opacity(0.15) : Color.secondary.opacity(0.12))
-                                .foregroundColor(isMultiSelectMode ? AppTheme.accent : .primary)
+                                .background(viewModel.isMultiSelectMode ? AppTheme.accent.opacity(0.15) : Color.secondary.opacity(0.12))
+                                .foregroundColor(viewModel.isMultiSelectMode ? AppTheme.accent : .primary)
                                 .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
@@ -261,9 +141,9 @@ struct QuickApplyView: View {
                         Divider()
 
                         // Patch List Rows
-                        ForEach(displayedPatches) { item in
+                        ForEach(viewModel.displayedPatches) { item in
                             patchRow(for: item)
-                            Divider() // เส้นแบ่งยาวเต็มหน้าจอ
+                            Divider()
                         }
                     }
                 }
@@ -271,23 +151,23 @@ struct QuickApplyView: View {
             }
             
             // Bottom Controls
-            if !filteredGamePatches.isEmpty && !isLoadingCatalog {
+            if !viewModel.filteredGamePatches.isEmpty && !viewModel.isLoadingCatalog {
                 bottomActionButtons
             }
         }
-        .navigationTitle(selectedApp.name)
+        .navigationTitle(viewModel.selectedApp.name)
         .navigationBarTitleDisplayMode(.large)
         .tint(AppTheme.accent)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     Task {
-                        await fetchCatalog(force: true)
+                        await viewModel.fetchCatalog(force: true)
                     }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .disabled(isLoadingCatalog || processingItemID != nil || isRestoringAll || isProcessingBatch)
+                .disabled(viewModel.isLoadingCatalog || viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch)
                 .accessibilityLabel("รีเฟรชข้อมูล")
             }
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -304,7 +184,7 @@ struct QuickApplyView: View {
             }
         }
         .task {
-            await fetchCatalog()
+            await viewModel.fetchCatalog()
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showLogs) { LogView() }
@@ -314,41 +194,39 @@ struct QuickApplyView: View {
 
     @ViewBuilder
     private func patchRow(for item: QuickPatchItem) -> some View {
-        let isApplied = activePatches[item.id] ?? false
-        let isSelected = selectedItems.contains(item.id)
+        let isApplied = viewModel.activePatches[item.id] ?? false
+        let isSelected = viewModel.selectedItems.contains(item.id)
         let isServerActive = item.active ?? true
-        let isDisabled = processingItemID != nil || isRestoringAll || isProcessingBatch
+        let isDisabled = viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch
 
         Button {
             guard !isDisabled else { return }
             
             if !isServerActive {
                 if isApplied {
-                    handleToggleChange(item: item, enable: false)
+                    viewModel.handleToggleChange(item: item, enable: false)
                 }
                 return
             }
 
-            if isMultiSelectMode {
-                toggleSelection(for: item)
+            if viewModel.isMultiSelectMode {
+                viewModel.toggleSelection(for: item)
             } else {
-                handleToggleChange(item: item, enable: !isApplied)
+                viewModel.handleToggleChange(item: item, enable: !isApplied)
             }
         } label: {
             HStack(alignment: .center, spacing: 10) {
-                // ไอคอนเลือกหลายรายการ (สไลด์ออกมาจากซ้ายเมื่อเปิดโหมดเลือกหลายรายการ)
-                if isMultiSelectMode {
+                if viewModel.isMultiSelectMode {
                     Image(systemName: isSelected ? "checkmark.circle" : "circle")
                         .font(.title3)
                         .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
                         .transition(.move(edge: .leading).combined(with: .opacity))
                         .onTapGesture {
                             guard !isDisabled && isServerActive else { return }
-                            toggleSelection(for: item)
+                            viewModel.toggleSelection(for: item)
                         }
                 }
 
-                // เนื้อหาหลักของ Row (ส่วนที่ถูกทำให้จางเมื่อปิดปรับปรุง)
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(item.title)
@@ -372,8 +250,7 @@ struct QuickApplyView: View {
 
                 Spacer(minLength: 4)
 
-                // แสดง Spinner หรือข้อความสถานะด้านขวา (ไม่ทับซ้อนกัน)
-                if processingItemID == item.id {
+                if viewModel.processingItemID == item.id {
                     ActivityIndicator(isAnimating: true, style: .medium)
                         .transition(.opacity)
                 } else if !isServerActive {
@@ -405,7 +282,7 @@ struct QuickApplyView: View {
             .padding(.vertical, 10)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
-            .animation(.easeInOut(duration: 0.25), value: isMultiSelectMode)
+            .animation(.easeInOut(duration: 0.25), value: viewModel.isMultiSelectMode)
         }
         .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
         .disabled(isDisabled || (!isServerActive && !isApplied))
@@ -417,7 +294,7 @@ struct QuickApplyView: View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
                 Button {
-                    restoreAllPatches()
+                    viewModel.restoreAllPatches()
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.counterclockwise.circle")
@@ -437,11 +314,11 @@ struct QuickApplyView: View {
                     )
                     .clipShape(Capsule())
                 }
-                .disabled(!hasActivePatches || processingItemID != nil || isRestoringAll || isProcessingBatch || isLoadingCatalog)
-                .opacity(hasActivePatches ? 1.0 : 0.4)
+                .disabled(!viewModel.hasActivePatches || viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch || viewModel.isLoadingCatalog)
+                .opacity(viewModel.hasActivePatches ? 1.0 : 0.4)
 
                 Button {
-                    openGame()
+                    viewModel.openGame()
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "gamecontroller")
@@ -460,17 +337,17 @@ struct QuickApplyView: View {
                     )
                     .clipShape(Capsule())
                 }
-                .disabled(processingItemID != nil || isRestoringAll || isProcessingBatch || isLoadingCatalog)
+                .disabled(viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch || viewModel.isLoadingCatalog)
             }
 
-            if !selectedItems.isEmpty {
+            if !viewModel.selectedItems.isEmpty {
                 Button {
-                    applyBatchPatches()
+                    viewModel.applyBatchPatches()
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "square.and.arrow.down")
                             .font(.headline)
-                        Text("Patch หลายรายการ (\(selectedItems.count))")
+                        Text("Patch หลายรายการ (\(viewModel.selectedItems.count))")
                             .font(.subheadline.bold())
                             .lineLimit(1)
                     }
@@ -484,391 +361,13 @@ struct QuickApplyView: View {
                     )
                     .clipShape(Capsule())
                 }
-                .disabled(processingItemID != nil || isRestoringAll || isProcessingBatch || isLoadingCatalog)
+                .disabled(viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch || viewModel.isLoadingCatalog)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: selectedItems.isEmpty)
+        .animation(.easeInOut(duration: 0.25), value: viewModel.selectedItems.isEmpty)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color(.systemBackground))
-    }
-
-    // MARK: - Logic Handlers
-
-    private func toggleSelection(for item: QuickPatchItem) {
-        if selectedItems.contains(item.id) {
-            selectedItems.remove(item.id)
-        } else {
-            if item.isAimCategory {
-                let currentAimIDs = filteredGamePatches.filter { $0.isAimCategory }.map { $0.id }
-                selectedItems.subtract(currentAimIDs)
-            }
-            selectedItems.insert(item.id)
-        }
-    }
-
-    private func isAllSmartSelected() -> Bool {
-        guard !availableItems.isEmpty else { return false }
-        
-        let firstAim = availableItems.first(where: { $0.isAimCategory })
-        let otherItems = availableItems.filter { !$0.isAimCategory }
-        
-        var expectedIDs = Set(otherItems.map { $0.id })
-        if let aim = firstAim {
-            expectedIDs.insert(aim.id)
-        }
-        
-        return selectedItems == expectedIDs
-    }
-
-    private func toggleSelectAll() {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            isMultiSelectMode.toggle()
-            if !isMultiSelectMode {
-                selectedItems.removeAll()
-            }
-        }
-    }
-
-    @MainActor
-    private func showSuccessNotification(message: String) {
-        let icon = UIImage(systemName: "checkmark.circle")?.withTintColor(.white, renderingMode: .alwaysOriginal)
-        FTNotificationIndicator.setNotificationIndicatorStyle(.dark)
-        FTNotificationIndicator.showNotification(
-            with: icon,
-            title: "สำเร็จ",
-            message: message
-        )
-    }
-
-    @MainActor
-    private func showErrorNotification(message: String) {
-        let icon = UIImage(systemName: "exclamationmark.triangle")?.withTintColor(.white, renderingMode: .alwaysOriginal)
-        FTNotificationIndicator.setNotificationIndicatorStyle(.dark)
-        FTNotificationIndicator.showNotification(
-            with: icon,
-            title: "ล้มเหลว",
-            message: message
-        )
-    }
-
-    private func openGame() {
-        let success = AppLauncher.launchApp(bundleID: selectedApp.bundleID)
-        if !success {
-            showErrorNotification(message: "ไม่สามารถเปิดแอปพลิเคชัน \(selectedApp.name) ได้")
-        }
-    }
-
-    private func localPatchURL(for id: String) -> URL? {
-        guard let appSupportURL = try? FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        ) else { return nil }
-
-        let targetDirectory = appSupportURL.appendingPathComponent(".c4", isDirectory: true)
-        return targetDirectory.appendingPathComponent("\(id).c4")
-    }
-
-    private func downloadFile(from urlString: String, to destinationURL: URL) async throws {
-        guard let remoteURL = URL(string: urlString) else {
-            throw PatchPackageError.invalidProject
-        }
-
-        let fileManager = FileManager.default
-        let targetDirectory = destinationURL.deletingLastPathComponent()
-
-        if !fileManager.fileExists(atPath: targetDirectory.path) {
-            try fileManager.createDirectory(at: targetDirectory, withIntermediateDirectories: true)
-        }
-
-        var request = URLRequest(
-            url: remoteURL,
-            cachePolicy: .reloadIgnoringLocalCacheData,
-            timeoutInterval: 30
-        )
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-
-        let (tempURL, response) = try await URLSession.shared.download(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            throw PatchPackageError.invalidProject
-        }
-
-        if fileManager.fileExists(atPath: destinationURL.path) {
-            try fileManager.removeItem(at: destinationURL)
-        }
-        try fileManager.moveItem(at: tempURL, to: destinationURL)
-    }
-
-    private func fetchCatalog(force: Bool = false) async {
-        if !patchItems.isEmpty && !force { return }
-
-        await MainActor.run { 
-            isLoadingCatalog = true 
-            HUDHelper.show(message: "")
-        }
-        let startTime = Date()
-
-        do {
-            var request = URLRequest(
-                url: catalogURL,
-                cachePolicy: .reloadIgnoringLocalCacheData,
-                timeoutInterval: 15
-            )
-            request.httpMethod = "GET"
-            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
-                let items = try JSONDecoder().decode([QuickPatchItem].self, from: data)
-
-                await MainActor.run {
-                    self.patchItems = items
-
-                    for item in items {
-                        if let localURL = self.localPatchURL(for: item.id),
-                           FileManager.default.fileExists(atPath: localURL.path),
-                           let packageData = try? Data(contentsOf: localURL),
-                           let decoded = try? PatchPackageCodec.decode(packageData, password: nil) {
-
-                            let hasReceipt = DevicePatchService.latestReceipt(projectID: decoded.project.id) != nil
-                            self.activePatches[item.id] = hasReceipt
-                        } else {
-                            self.activePatches[item.id] = false
-                        }
-                    }
-                }
-            }
-        } catch {
-            print("Fetch catalog failed: \(error)")
-        }
-
-        let elapsedTime = Date().timeIntervalSince(startTime)
-        let minDuration: TimeInterval = 1.0
-        if elapsedTime < minDuration {
-            let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: remainingTime)
-        }
-
-        await MainActor.run {
-            self.isLoadingCatalog = false
-            HUDHelper.hide()
-        }
-    }
-
-    private nonisolated func translatePatchError(_ error: PatchPackageError) -> String {
-        switch error.localizationKey {
-        case "patch.error.invalid_project":
-            return "โปรดตรวจสอบชื่อโปรเจกต์, Bundle เป้าหมาย และเนื้อหาใน Workspace"
-        case "patch.error.app_unavailable":
-            return "ไม่พบหรือไม่สามารถเปิดแอป Bundle \(selectedApp.bundleID) ได้"
-        case "patch.error.apply":
-            return "ไม่สามารถใช้งาน Patch ได้ ระบบได้ทำการย้อนคืนการเขียนไฟล์ก่อนหน้าทั้งหมดแล้ว"
-        case "patch.error.duplicate_target":
-            return "มีเงื่อนไข (Rules) ซ้ำซ้อนที่ชี้ไปที่ไฟล์แอปเดียวกัน"
-        case "patch.error.invalid_bundle":
-            return "โปรดระบุ App Bundle Identifier ที่ถูกต้อง ไม่ใช่ Container UUID"
-        case "patch.error.password_or_corrupt":
-            return "รหัสผ่านไม่ถูกต้อง หรือไฟล์ Package ถูกดัดแปลง/เสียหาย"
-        case "patch.error.restore":
-            return "ไม่สามารถคืนค่าไฟล์ต้นฉบับได้อย่างปลอดภัย ไม่มีเป้าหมายที่ไม่ได้รับการยืนยันถูกเขียนทับ"
-        case "patch.error.size_limit":
-            return "ไฟล์ Package หรือไฟล์ที่นำมาแทนที่ มีขนาดเกินขีดจำกัดที่รองรับ"
-        default:
-            return error.localizationKey
-        }
-    }
-
-    private func handleToggleChange(item: QuickPatchItem, enable: Bool) {
-        processingItemID = item.id
-
-        Task.detached(priority: .userInitiated) {
-            do {
-                guard let applyURL = await self.localPatchURL(for: item.id) else {
-                    throw PatchPackageError.invalidProject
-                }
-
-                if enable {
-                    if item.isAimCategory {
-                        let activeAimItems = await self.filteredGamePatches.filter { $0.isAimCategory && $0.id != item.id }
-                        for aimItem in activeAimItems {
-                            await MainActor.run {
-                                self.activePatches[aimItem.id] = false
-                            }
-                            if let aimURL = await self.localPatchURL(for: aimItem.id),
-                               FileManager.default.fileExists(atPath: aimURL.path),
-                               let packageData = try? Data(contentsOf: aimURL),
-                               let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil) {
-                                
-                                if let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
-                                    try? DevicePatchService.restore(receipt: receipt)
-                                }
-                                try? FileManager.default.removeItem(at: aimURL)
-                            }
-                        }
-                    }
-
-                    if FileManager.default.fileExists(atPath: applyURL.path),
-                       let existingData = try? Data(contentsOf: applyURL),
-                       let existingDecoded = try? PatchPackageCodec.decode(existingData, password: nil),
-                       let existingReceipt = DevicePatchService.latestReceipt(projectID: existingDecoded.project.id) {
-                        try? DevicePatchService.restore(receipt: existingReceipt)
-                    }
-
-                    try await self.downloadFile(from: item.downloadUrl, to: applyURL)
-
-                    let packageData = try Data(contentsOf: applyURL)
-                    let decodedPackage = try PatchPackageCodec.decode(packageData, password: nil)
-
-                    _ = try DevicePatchService.apply(project: decodedPackage.project)
-
-                    await MainActor.run {
-                        self.activePatches[item.id] = true
-                        self.processingItemID = nil
-                        self.showSuccessNotification(message: "ติดตั้ง Patch เรียบร้อยแล้ว")
-                    }
-
-                } else {
-                    if FileManager.default.fileExists(atPath: applyURL.path) {
-                        if let packageData = try? Data(contentsOf: applyURL),
-                           let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil),
-                           let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
-                            try? DevicePatchService.restore(receipt: receipt)
-                        }
-                        try? FileManager.default.removeItem(at: applyURL)
-                    }
-
-                    await MainActor.run {
-                        self.activePatches[item.id] = false
-                        self.processingItemID = nil
-                        self.showSuccessNotification(message: "คืนค่า Patch ต้นฉบับเรียบร้อยแล้ว")
-                    }
-                }
-            } catch let error as PatchPackageError {
-                let message = self.translatePatchError(error)
-                await MainActor.run {
-                    self.processingItemID = nil
-                    self.showErrorNotification(message: message)
-                }
-            } catch {
-                await MainActor.run {
-                    self.processingItemID = nil
-                    let message = enable ? "ไม่สามารถใช้งาน Patch ได้ ระบบได้ทำการยกเลิกการเขียนไฟล์ก่อนหน้าทั้งหมดแล้ว" : "ไม่สามารถคืนค่าไฟล์ต้นฉบับได้"
-                    self.showErrorNotification(message: message)
-                }
-            }
-        }
-    }
-
-    private func applyBatchPatches() {
-        isProcessingBatch = true
-
-        Task.detached(priority: .userInitiated) {
-            let selectedIDs = await self.selectedItems
-            let itemsToApply = await self.filteredGamePatches.filter { selectedIDs.contains($0.id) }
-            var successCount = 0
-
-            for item in itemsToApply {
-                do {
-                    guard let applyURL = await self.localPatchURL(for: item.id) else { continue }
-
-                    if item.isAimCategory {
-                        let activeAimItems = await self.filteredGamePatches.filter { $0.isAimCategory && $0.id != item.id }
-                        for aimItem in activeAimItems {
-                            await MainActor.run {
-                                self.activePatches[aimItem.id] = false
-                            }
-                            if let aimURL = await self.localPatchURL(for: aimItem.id),
-                               FileManager.default.fileExists(atPath: aimURL.path),
-                               let packageData = try? Data(contentsOf: aimURL),
-                               let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil) {
-                                
-                                if let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
-                                    try? DevicePatchService.restore(receipt: receipt)
-                                }
-                                try? FileManager.default.removeItem(at: aimURL)
-                            }
-                        }
-                    }
-
-                    if FileManager.default.fileExists(atPath: applyURL.path),
-                       let existingData = try? Data(contentsOf: applyURL),
-                       let existingDecoded = try? PatchPackageCodec.decode(existingData, password: nil),
-                       let existingReceipt = DevicePatchService.latestReceipt(projectID: existingDecoded.project.id) {
-                        try? DevicePatchService.restore(receipt: existingReceipt)
-                    }
-
-                    try await self.downloadFile(from: item.downloadUrl, to: applyURL)
-
-                    let packageData = try Data(contentsOf: applyURL)
-                    let decodedPackage = try PatchPackageCodec.decode(packageData, password: nil)
-
-                    _ = try DevicePatchService.apply(project: decodedPackage.project)
-
-                    successCount += 1
-                    await MainActor.run {
-                        self.activePatches[item.id] = true
-                    }
-                } catch {
-                    print("Failed batch patch item \(item.id): \(error)")
-                }
-            }
-
-            let finalSuccessCount = successCount
-            await MainActor.run {
-                self.isProcessingBatch = false
-                self.selectedItems.removeAll()
-                self.isMultiSelectMode = false
-                if finalSuccessCount > 0 {
-                    self.showSuccessNotification(message: "ติดตั้ง Patch (\(finalSuccessCount) รายการ) เรียบร้อยแล้ว")
-                } else {
-                    self.showErrorNotification(message: "ไม่สามารถติดตั้ง Patch ที่เลือกได้")
-                }
-            }
-        }
-    }
-
-    private func restoreAllPatches() {
-        isRestoringAll = true
-
-        Task.detached(priority: .userInitiated) {
-            var count = 0
-            let currentItems = await self.filteredGamePatches
-
-            for item in currentItems {
-                guard let applyURL = await self.localPatchURL(for: item.id) else { continue }
-
-                if FileManager.default.fileExists(atPath: applyURL.path) {
-                    if let packageData = try? Data(contentsOf: applyURL),
-                       let decodedPackage = try? PatchPackageCodec.decode(packageData, password: nil),
-                       let receipt = DevicePatchService.latestReceipt(projectID: decodedPackage.project.id) {
-                        if (try? DevicePatchService.restore(receipt: receipt)) != nil {
-                            count += 1
-                        }
-                    }
-                    try? FileManager.default.removeItem(at: applyURL)
-                }
-
-                await MainActor.run {
-                    self.activePatches[item.id] = false
-                }
-            }
-
-            let finalCount = count
-            await MainActor.run {
-                self.isRestoringAll = false
-                self.selectedItems.removeAll()
-                self.isMultiSelectMode = false
-                if finalCount > 0 {
-                    self.showSuccessNotification(message: "คืนค่า Patch ต้นฉบับเรียบร้อยแล้ว")
-                } else {
-                    self.showSuccessNotification(message: "รีเซ็ตสถานะคืนค่าเดิมทั้งหมดเรียบร้อยแล้ว")
-                }
-            }
-        }
     }
 }
