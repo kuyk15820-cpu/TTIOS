@@ -117,7 +117,9 @@ struct QuickApplyView: View {
                             
                             // ปุ่มเลือกหลายรายการ
                             Button {
-                                viewModel.toggleSelectAll()
+                                withAnimation(.easeInOut(duration: 0.22)) {
+                                    viewModel.toggleSelectAll()
+                                }
                             } label: {
                                 HStack(spacing: 4) {
                                     Image(systemName: viewModel.isMultiSelectMode ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
@@ -190,7 +192,7 @@ struct QuickApplyView: View {
         .sheet(isPresented: $showLogs) { LogView() }
     }
 
-    // MARK: - Patch Row Component (Animation-Free)
+    // MARK: - Patch Row Component
 
     @ViewBuilder
     private func patchRow(for item: QuickPatchItem) -> some View {
@@ -220,10 +222,12 @@ struct QuickApplyView: View {
             }
         } label: {
             HStack(alignment: .center, spacing: 10) {
+                // 🟢 คืนอนิเมชั่นสไลด์นุ่มนวลให้ส่วน Checkmark ตอนเปิด/ปิดโหมด Multi-Select
                 if viewModel.isMultiSelectMode {
                     Image(systemName: isSelected ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
                         .font(.title3)
                         .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
+                        .transition(.move(edge: .leading).combined(with: .opacity))
                         .onTapGesture {
                             guard !isDisabled && isServerActive else { return }
                             viewModel.toggleSelection(for: item)
@@ -253,7 +257,7 @@ struct QuickApplyView: View {
 
                 Spacer(minLength: 4)
 
-                // สลับการแสดงผลด้วย Opacity ใน ZStack เพื่อกำจัด Cross-Dissolve Animation เวลาเปลี่ยนสถานะ
+                // 🔴 แยกส่วนนี้ให้อัปเดตสถานะ/Spinner ทันทีโดยปิด Animation เฉพาะตรงนี้
                 ZStack(alignment: .trailing) {
                     ActivityIndicator(isAnimating: isRowProcessing, style: .medium)
                         .opacity(isRowProcessing ? 1.0 : 0.0)
@@ -285,18 +289,16 @@ struct QuickApplyView: View {
                     }
                     .opacity(isRowProcessing ? 0.0 : 1.0)
                 }
+                .transaction { $0.animation = nil }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
+            .animation(.easeInOut(duration: 0.22), value: viewModel.isMultiSelectMode)
         }
         .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
         .disabled(isDisabled || (!isServerActive && !isApplied))
-        .transaction { transaction in
-            // บังคับปิดอนิเมชั่นทั้งหมดในระดับ Row โดยตรง
-            transaction.animation = nil
-        }
     }
 
     // MARK: - Bottom Action Buttons
@@ -373,8 +375,10 @@ struct QuickApplyView: View {
                     .clipShape(Capsule())
                 }
                 .disabled(viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch || viewModel.isLoadingCatalog)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .animation(.easeInOut(duration: 0.22), value: viewModel.selectedItems.isEmpty)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color(.systemBackground))
