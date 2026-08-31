@@ -16,7 +16,6 @@ struct TargetGameApp: Identifiable, Hashable, Decodable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.bundleID = try container.decode(String.self, forKey: .bundleID)
         
-        // ถ้าใน JSON มี field name ให้ใช้ค่านั้น ถ้าไม่มีหรือเป็นค่าว่าง ให้ใช้ระบบดึงชื่อแอปอัตโนมัติ
         if let decodedName = try container.decodeIfPresent(String.self, forKey: .name), !decodedName.isEmpty {
             self.name = decodedName
         } else {
@@ -43,15 +42,6 @@ struct TargetGameApp: Identifiable, Hashable, Decodable {
     // MARK: - Private Helpers
 
     private static func fetchAppName(for bundleID: String) -> String {
-        let presetApps: [String: String] = [
-            SecretKeys.bundleFFTH: SecretKeys.nameFFTH,
-            SecretKeys.bundleFFMAX: SecretKeys.nameFFMAX
-        ]
-        
-        if let presetName = presetApps[bundleID] {
-            return presetName
-        }
-
         if let proxyClass = NSClassFromString(SecretKeys.classNameLSApplicationProxy) as? NSObject.Type,
            let proxy = proxyClass.perform(Selector((SecretKeys.selectorAppProxyForIdentifier)), with: bundleID)?.takeUnretainedValue() as? NSObject {
             
@@ -60,8 +50,7 @@ struct TargetGameApp: Identifiable, Hashable, Decodable {
             }
         }
 
-        let fallback = bundleID.components(separatedBy: ".").last?.capitalized ?? bundleID
-        return fallback
+        return bundleID.components(separatedBy: ".").last?.capitalized ?? bundleID
     }
     
     static func == (lhs: TargetGameApp, rhs: TargetGameApp) -> Bool {
