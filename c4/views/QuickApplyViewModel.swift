@@ -93,11 +93,11 @@ class QuickApplyViewModel: ObservableObject {
     }
 
     func toggleSelectAll() {
-                    isMultiSelectMode.toggle()
-            if !isMultiSelectMode {
-                selectedItems.removeAll()
-            }
-        }    
+        isMultiSelectMode.toggle()
+        if !isMultiSelectMode {
+            selectedItems.removeAll()
+        }
+    }    
 
     func openGame() {
         let success = AppLauncher.launchApp(bundleID: selectedApp.bundleID)
@@ -172,11 +172,15 @@ class QuickApplyViewModel: ObservableObject {
         try fileManager.moveItem(at: tempURL, to: destinationURL)
     }
 
-    func fetchCatalog(force: Bool = false) async {
+    func fetchCatalog(force: Bool = false, showHUD: Bool = true) async {
         if !patchItems.isEmpty && !force { return }
 
         isLoadingCatalog = true 
-        HUDHelper.show(message: "")
+        
+        // 🟢 ควบคุมการแสดง HUD ตามค่า showHUD
+        if showHUD {
+            HUDHelper.show(message: "")
+        }
         
         let startTime = Date()
 
@@ -209,9 +213,14 @@ class QuickApplyViewModel: ObservableObject {
                         self.activePatches[item.id] = false
                     }
                 }
+            } else {
+                // 🔴 HTTP Code ไม่ผ่าน ให้ล้างรายการทิ้ง
+                self.patchItems = []
             }
         } catch {
             print("Fetch catalog failed: \(error)")
+            // 🔴 ดึงข้อมูลล้มเหลว (เช่น ไม่พบเครือข่าย) ล้างข้อมูลออกเพื่อให้ View สลับไปหน้า Empty State
+            self.patchItems = []
         }
 
         let elapsedTime = Date().timeIntervalSince(startTime)
@@ -222,7 +231,11 @@ class QuickApplyViewModel: ObservableObject {
         }
 
         self.isLoadingCatalog = false
-        HUDHelper.hide()
+        
+        // 🟢 ซ่อน HUD เมื่อเปิดไว้
+        if showHUD {
+            HUDHelper.hide()
+        }
     }
 
     private nonisolated func translatePatchError(_ error: PatchPackageError) -> String {
