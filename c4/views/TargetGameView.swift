@@ -72,7 +72,7 @@ struct TargetGameView: View {
                     .navigationTitle(SecretKeys.textHomeNavigationTitle)
                     .navigationBarTitleDisplayMode(.large)
                     .toolbar {
-                        // 🟢 ปุ่มรีเฟรชที่มุมขวาบน
+                        // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ช่องทางเดียวสำหรับการรีเฟรช)
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button {
                                 Task {
@@ -87,9 +87,6 @@ struct TargetGameView: View {
                     }
                     .navigationDestination(for: TargetGameApp.self) { app in
                         QuickApplyView(selectedApp: app)
-                    }
-                    .refreshable {
-                        await fetchTargetGames()
                     }
                 }
             }
@@ -117,13 +114,14 @@ struct TargetGameView: View {
         do {
             var request = URLRequest(
                 url: url,
-                cachePolicy: .reloadIgnoringLocalCacheData,
+                // ป้องกันการดึงข้อมูลจาก Cache ทั้งฝั่ง Local และ Remote
+                cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
                 timeoutInterval: 15
             )
             request.httpMethod = "GET"
             request.setValue(SecretKeys.userAgentValue, forHTTPHeaderField: SecretKeys.userAgentHeader)
 
-            // 🟢 เปลี่ยนมาใช้ URLSession.pinned เพื่อความปลอดภัยผ่าน SSL Pinning Delegate
+            // ใช้ URLSession.pinned เพื่อความปลอดภัยผ่าน SSL Pinning Delegate
             let (data, response) = try await URLSession.pinned.data(for: request)
             
             if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
@@ -132,9 +130,18 @@ struct TargetGameView: View {
                 await MainActor.run {
                     self.targetApps = decodedGames
                 }
+            } else {
+                // หาก Status Code ไม่สำเร็จ ให้ล้างข้อมูลออก
+                await MainActor.run {
+                    self.targetApps = []
+                }
             }
         } catch {
             print("Failed to fetch target games: \(error.localizedDescription)")
+            // หากเกิด Error (เช่น ปิดเน็ต/ไม่มีสัญญาณ) ให้ล้างข้อมูลเพื่อให้แสดง Empty State
+            await MainActor.run {
+                self.targetApps = []
+            }
         }
 
         // การันตีการแสดง HUD อย่างน้อย 1.0 วินาที เพื่อให้ประสบการณ์ผู้ใช้งานสม่ำเสมอ
