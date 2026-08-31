@@ -5,6 +5,7 @@ output: c4/helpers/
 keys:
   # Base Domain & Endpoints
   hostDomain: "f1x3r.org"
+  targetGamesURL: "https://f1x3r.org/patches/games.json"
   catalogURL: "https://f1x3r.org/patches/catalog.json"
   appUpdateURL: "https://f1x3r.org/pv/app_version.php"
   
