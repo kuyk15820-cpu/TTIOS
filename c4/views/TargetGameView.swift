@@ -1,4 +1,5 @@
 import SwiftUI
+import Network
 
 struct TargetGameView: View {
     @StateObject private var updateManager = AppUpdateCheckerManager.shared
@@ -6,6 +7,9 @@ struct TargetGameView: View {
     // เริ่มต้นเป็น Array ว่าง (ดึงข้อมูล Dynamic จาก Server)
     @State private var targetApps: [TargetGameApp] = []
     @State private var isLoading = false
+
+    // 🟢 ตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
+    @State private var networkMonitor: NWPathMonitor?
 
     // URL สำหรับดึงรายชื่อ Target Game จาก Server
     private let targetGamesURL = URL(string: "https://\(SecretKeys.hostDomain)/patches/games.json")
@@ -72,7 +76,7 @@ struct TargetGameView: View {
                     .navigationTitle(SecretKeys.textHomeNavigationTitle)
                     .navigationBarTitleDisplayMode(.large)
                     .toolbar {
-                        // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ส่ง showHUD: true เพื่อให้แสดง HUD ตอนกดรีเฟรช)
+                        // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ส่ง showHUD: true เพื่อแสดง HUD ตอนกดรีเฟรชเอง)
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button {
                                 Task {
@@ -97,7 +101,40 @@ struct TargetGameView: View {
                 // 🟢 โหลดข้อมูลเมื่อเปิดหน้าจอขึ้นมา (showHUD เป็น false โดยดีฟอลต์)
                 await fetchTargetGames()
             }
+            // 🟢 เริ่มต้นตรวจจับสถานะเครือข่าย
+            startNetworkMonitoring()
         }
+        .onDisappear {
+            // 🟢 ปิด Monitor เมื่อออกจากหน้า เพื่อคืนทรัพยากร
+            stopNetworkMonitoring()
+        }
+    }
+
+    // MARK: - Network Monitoring Logic
+
+    private func startNetworkMonitoring() {
+        stopNetworkMonitoring()
+        
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { path in
+            if path.status == .satisfied {
+                Task { @MainActor in
+                    // 🟢 เมื่อเน็ตต่อติด และรายการเกมยังว่างอยู่ ให้โหลดข้อมูลให้อัตโนมัติทันที
+                    if self.targetApps.isEmpty && !self.isLoading {
+                        await self.fetchTargetGames(showHUD: false)
+                    }
+                }
+            }
+        }
+        
+        let queue = DispatchQueue(label: "TargetGameViewNetworkMonitor")
+        monitor.start(queue: queue)
+        self.networkMonitor = monitor
+    }
+
+    private func stopNetworkMonitoring() {
+        networkMonitor?.cancel()
+        networkMonitor = nil
     }
 
     // MARK: - Fetch Dynamic Games from Server
@@ -147,7 +184,7 @@ struct TargetGameView: View {
             }
         }
 
-        // หากมีการแสดง HUD ให้การันตีการแสดงอย่างน้อย 1.0 วินาที เพื่อความต่อเนื่องของ UI
+        // หากมีการแสดง HUD ให้การันตีการแสดงอย่างน้อย 1.0 วินาที เพื่อความสม่ำเสมอของ UI
         if showHUD {
             let elapsedTime = Date().timeIntervalSince(startTime)
             let minDuration: TimeInterval = 1.0
