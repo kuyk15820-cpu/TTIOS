@@ -11,30 +11,20 @@ struct CategoryTabBar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(categories, id: \.self) { category in
-                            CategoryTabButton(
-                                title: category,
-                                isSelected: selectedCategory == category,
-                                count: countProvider(category)
-                            ) {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedCategory = category
-                                }
-                            }
-                            .id(category)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(categories, id: \.self) { category in
+                        CategoryTabButton(
+                            title: category,
+                            isSelected: selectedCategory == category,
+                            count: countProvider(category)
+                        ) {
+                            selectedCategory = category
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
                 }
-                .onChange(of: selectedCategory) { newCategory in
-                    withAnimation {
-                        proxy.scrollTo(newCategory, anchor: .center)
-                    }
-                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
             }
             .background(Color(.systemBackground))
 
@@ -103,8 +93,8 @@ struct QuickApplyView: View {
                 // ขณะรีเฟรชหรือโหลดข้อมูล -> ซ่อน List ทั้งหมด
                 Color.clear
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if viewModel.filteredGamePatches.isEmpty {
-                // โหลดเสร็จแล้วแต่ไม่มีข้อมูลเลย -> แสดง Empty State
+            } else if viewModel.displayedPatches.isEmpty {
+                // โหลดเสร็จแล้วแต่ไม่มีข้อมูล -> แสดง Empty State
                 VStack(spacing: 12) {
                     Image(systemName: SecretKeys.iconEmptyState)
                         .font(.system(size: 40))
@@ -115,15 +105,52 @@ struct QuickApplyView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // 🟢 ใช้ TabView แบบ Page Style โดยซ่อน Page Indicator (ไข่ปลา) ออกด้วย .never
-                // ผูกกับการเลือกหมวดหมู่ ทำให้ปัดซ้าย-ขวาเพื่อเปลี่ยนหมวดหมู่ได้อย่างนุ่มนวล
-                TabView(selection: $viewModel.selectedCategory) {
-                    ForEach(viewModel.availableCategories, id: \.self) { category in
-                        categoryContentView(for: category)
-                            .tag(category)
+                // โหลดเสร็จและมีข้อมูล -> แสดง List
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Section Header สไตล์ Native List
+                        HStack {
+                            Text("\(SecretKeys.textActivePatchesPrefix)\(viewModel.activeDisplayedPatchesCount)\(SecretKeys.textActivePatchesSuffix)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            // ปุ่มเลือกหลายรายการ
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.22)) {
+                                    viewModel.toggleSelectAll()
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: viewModel.isMultiSelectMode ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
+                                        .font(.caption)
+                                    Text(SecretKeys.textMultiSelect)
+                                        .font(.caption.bold())
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(viewModel.isMultiSelectMode ? AppTheme.accent.opacity(0.15) : Color.secondary.opacity(0.12))
+                                .foregroundColor(viewModel.isMultiSelectMode ? AppTheme.accent : .primary)
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                        .background(Color(.systemGroupedBackground))
+
+                        Divider()
+
+                        // Patch List Rows
+                        ForEach(viewModel.displayedPatches) { item in
+                            patchRow(for: item)
+                            Divider()
+                        }
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                .background(Color(.systemBackground))
             }
             
             // Bottom Controls
@@ -160,74 +187,6 @@ struct QuickApplyView: View {
         .onDisappear {
             // 🟢 ยกเลิกการดักจับเมื่อออกจากหน้าจอ
             stopNetworkMonitoring()
-        }
-    }
-
-    // MARK: - Category Content View
-
-    @ViewBuilder
-    private func categoryContentView(for category: String) -> some View {
-        let items = viewModel.filteredGamePatches.filter {
-            if category == SecretKeys.categoryAll { return true }
-            return ($0.category?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") == category.lowercased()
-        }
-
-        if items.isEmpty {
-            VStack(spacing: 12) {
-                Image(systemName: SecretKeys.iconEmptyState)
-                    .font(.system(size: 40))
-                    .foregroundColor(.secondary)
-                Text(SecretKeys.textNoPatchesFound)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    // Section Header สไตล์ Native List
-                    HStack {
-                        Text("\(SecretKeys.textActivePatchesPrefix)\(items.filter { $0.active ?? true }.count)\(SecretKeys.textActivePatchesSuffix)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        Spacer()
-                        
-                        // ปุ่มเลือกหลายรายการ
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.22)) {
-                                viewModel.toggleSelectAll()
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: viewModel.isMultiSelectMode ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
-                                    .font(.caption)
-                                Text(SecretKeys.textMultiSelect)
-                                    .font(.caption.bold())
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(viewModel.isMultiSelectMode ? AppTheme.accent.opacity(0.15) : Color.secondary.opacity(0.12))
-                            .foregroundColor(viewModel.isMultiSelectMode ? AppTheme.accent : .primary)
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-                    .background(Color(.systemGroupedBackground))
-
-                    Divider()
-
-                    // Patch List Rows
-                    ForEach(items) { item in
-                        patchRow(for: item)
-                        Divider()
-                    }
-                }
-            }
-            .background(Color(.systemBackground))
         }
     }
 
