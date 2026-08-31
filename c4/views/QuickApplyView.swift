@@ -70,7 +70,7 @@ struct QuickApplyView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
 
-    // 🟢 เพิ่มตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
+    // 🟢 ตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
     @State private var networkMonitor: NWPathMonitor?
 
     init(selectedApp: TargetGameApp) {
@@ -162,11 +162,12 @@ struct QuickApplyView: View {
         .navigationBarTitleDisplayMode(.large)
         .tint(AppTheme.accent)
         .toolbar {
-            // เหลือ Toolbar เฉพาะปุ่ม Refresh เพียงอย่างเดียว
+            // Toolbar ปุ่ม Refresh
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     Task {
-                        await viewModel.fetchCatalog(force: true)
+                        // 🟢 ส่ง force: true และ showHUD: true เมื่อผู้ใช้กดรีเฟรชเอง
+                        await viewModel.fetchCatalog(force: true, showHUD: true)
                     }
                 } label: {
                     Image(systemName: SecretKeys.iconRefresh)
@@ -176,7 +177,8 @@ struct QuickApplyView: View {
             }
         }
         .task {
-            await viewModel.fetchCatalog()
+            // 🟢 โหลดข้อมูลครั้งแรกตามปกติ (แสดง HUD)
+            await viewModel.fetchCatalog(showHUD: true)
         }
         .onAppear {
             // 🟢 เริ่มดักจับการเชื่อมต่อเครือข่ายเมื่อหน้าจอแสดงผล
@@ -197,9 +199,10 @@ struct QuickApplyView: View {
         monitor.pathUpdateHandler = { path in
             if path.status == .satisfied {
                 Task { @MainActor in
-                    // 🟢 ถ้าเน็ตกลับมาต่อติด และข้อมูล Patch ยังว่างอยู่ ให้โหลด Catalog ให้อัตโนมัติทันที
+                    // 🟢 เมื่ออินเทอร์เน็ตกลับมา และข้อมูล Patch ยังว่างอยู่
+                    // สั่งดึงข้อมูลแบบเบื้องหลังโดยส่ง showHUD: false เพื่อไม่ให้ HUD เด้งกวนผู้ใช้
                     if self.viewModel.displayedPatches.isEmpty && !self.viewModel.isLoadingCatalog {
-                        await self.viewModel.fetchCatalog()
+                        await self.viewModel.fetchCatalog(showHUD: false)
                     }
                 }
             }
@@ -224,7 +227,6 @@ struct QuickApplyView: View {
         let isServerActive = item.active ?? true
         let isDisabled = viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch
         
-        // 🔴 ปรับเงื่อนไข ActivityIndicator: ไม่แสดงถ้าเป็นการปิด Patch (isApplied == true)
         let isRowProcessing = !isApplied && (
             viewModel.processingItemID == item.id 
             || (viewModel.isProcessingBatch && isSelected)
@@ -247,7 +249,6 @@ struct QuickApplyView: View {
             }
         } label: {
             HStack(alignment: .center, spacing: 10) {
-                // อนิเมชั่นสไลด์สำหรับ Checkmark ในโหมดเลือกหลายรายการ
                 if viewModel.isMultiSelectMode {
                     Image(systemName: isSelected ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
                         .font(.title3)
@@ -282,7 +283,6 @@ struct QuickApplyView: View {
 
                 Spacer(minLength: 4)
 
-                // ปิด Animation เฉพาะในส่วนของ Indicator และสถานะขวามือ
                 ZStack(alignment: .trailing) {
                     ActivityIndicator(isAnimating: isRowProcessing, style: .medium)
                         .opacity(isRowProcessing ? 1.0 : 0.0)
