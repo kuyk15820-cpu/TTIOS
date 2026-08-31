@@ -11,8 +11,8 @@ struct TargetGameView: View {
     // 🟢 ตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
     @State private var networkMonitor: NWPathMonitor?
 
-    // URL สำหรับดึงรายชื่อ Target Game จาก Server
-    private let targetGamesURL = URL(string: "https://\(SecretKeys.hostDomain)/patches/games.json")
+    // 🟢 URL สำหรับดึงรายชื่อ Target Game จาก Server (ปรับไปดึงผ่าน SecretKeys.targetGamesURL)
+    private let targetGamesURL = URL(string: SecretKeys.targetGamesURL)
 
     var body: some View {
         Group {
