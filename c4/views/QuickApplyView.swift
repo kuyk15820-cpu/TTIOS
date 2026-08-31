@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Network
 
 // MARK: - Filter Bar Components
 
@@ -68,6 +69,9 @@ struct QuickApplyView: View {
     @StateObject private var viewModel: QuickApplyViewModel
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
+
+    // 🟢 เพิ่มตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
+    @State private var networkMonitor: NWPathMonitor?
 
     init(selectedApp: TargetGameApp) {
         _viewModel = StateObject(wrappedValue: QuickApplyViewModel(selectedApp: selectedApp))
@@ -174,6 +178,41 @@ struct QuickApplyView: View {
         .task {
             await viewModel.fetchCatalog()
         }
+        .onAppear {
+            // 🟢 เริ่มดักจับการเชื่อมต่อเครือข่ายเมื่อหน้าจอแสดงผล
+            startNetworkMonitoring()
+        }
+        .onDisappear {
+            // 🟢 ยกเลิกการดักจับเมื่อออกจากหน้าจอ
+            stopNetworkMonitoring()
+        }
+    }
+
+    // MARK: - Network Monitoring Logic
+
+    private func startNetworkMonitoring() {
+        stopNetworkMonitoring()
+        
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { path in
+            if path.status == .satisfied {
+                Task { @MainActor in
+                    // 🟢 ถ้าเน็ตกลับมาต่อติด และข้อมูล Patch ยังว่างอยู่ ให้โหลด Catalog ให้อัตโนมัติทันที
+                    if self.viewModel.displayedPatches.isEmpty && !self.viewModel.isLoadingCatalog {
+                        await self.viewModel.fetchCatalog()
+                    }
+                }
+            }
+        }
+        
+        let queue = DispatchQueue(label: "QuickApplyViewNetworkMonitor")
+        monitor.start(queue: queue)
+        self.networkMonitor = monitor
+    }
+
+    private func stopNetworkMonitoring() {
+        networkMonitor?.cancel()
+        networkMonitor = nil
     }
 
     // MARK: - Patch Row Component
