@@ -11,7 +11,7 @@ struct TargetGameView: View {
     // 🟢 ตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
     @State private var networkMonitor: NWPathMonitor?
 
-    // 🟢 URL สำหรับดึงรายชื่อ Target Game จาก Server (ปรับไปดึงผ่าน SecretKeys.targetGamesURL)
+    // 🟢 URL สำหรับดึงรายชื่อ Target Game จาก Server (ดึงผ่าน SecretKeys.targetGamesURL)
     private let targetGamesURL = URL(string: SecretKeys.targetGamesURL)
 
     var body: some View {
@@ -167,8 +167,11 @@ struct TargetGameView: View {
             if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
                 let decodedGames = try JSONDecoder().decode([TargetGameApp].self, from: data)
                 
+                // 🟢 กรองเอาเฉพาะเกมที่ active != false (ถ้าไม่ได้ส่งมาจะถือว่าเป็น true)
+                let activeGames = decodedGames.filter { $0.active ?? true }
+                
                 await MainActor.run {
-                    self.targetApps = decodedGames
+                    self.targetApps = activeGames
                 }
             } else {
                 // หาก Status Code ไม่สำเร็จ ให้ล้างข้อมูลออก
