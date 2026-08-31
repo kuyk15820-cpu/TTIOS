@@ -3,11 +3,8 @@ import SwiftUI
 struct TargetGameView: View {
     @StateObject private var updateManager = AppUpdateCheckerManager.shared
 
-    // รายการเกมที่จะแสดงบน UI (เริ่มต้นด้วยค่า Preset สำรอง)
-    @State private var targetApps: [TargetGameApp] = [
-        TargetGameApp(bundleID: SecretKeys.bundleFFTH),
-        TargetGameApp(bundleID: SecretKeys.bundleFFMAX)
-    ]
+    // เริ่มต้นเป็น Array ว่าง (ดึงข้อมูล Dynamic จาก Server)
+    @State private var targetApps: [TargetGameApp] = []
     @State private var isLoading = false
 
     // URL สำหรับดึงรายชื่อ Target Game จาก Server
@@ -25,35 +22,69 @@ struct TargetGameView: View {
             } else {
                 // 🔵 ถ้าไม่มีอัปเดต แสดงรายการเลือกเกมปกติ
                 NavigationStack {
-                    List {
-                        Section {
-                            ForEach(targetApps) { app in
-                                NavigationLink(value: app) {
-                                    HStack(spacing: 12) {
-                                        if let icon = app.icon {
-                                            Image(uiImage: icon)
-                                                .resizable()
-                                                .frame(width: 32, height: 32)
-                                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        } else {
-                                            Image(systemName: SecretKeys.iconAppWindowCheckmark)
-                                                .font(.title2)
-                                                .foregroundStyle(Color.primary)
-                                        }
+                    Group {
+                        if isLoading {
+                            // ขณะกำลังโหลดข้อมูล -> ซ่อน List ทั้งหมด
+                            Color.clear
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if targetApps.isEmpty {
+                            // โหลดเสร็จแล้วแต่ไม่มีรายการเกม -> แสดง Empty State
+                            VStack(spacing: 12) {
+                                Image(systemName: SecretKeys.iconEmptyState)
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.secondary)
+                                Text(SecretKeys.textNoPatchesFound)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            // มีรายการเกม -> แสดง List
+                            List {
+                                Section {
+                                    ForEach(targetApps) { app in
+                                        NavigationLink(value: app) {
+                                            HStack(spacing: 12) {
+                                                if let icon = app.icon {
+                                                    Image(uiImage: icon)
+                                                        .resizable()
+                                                        .frame(width: 32, height: 32)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                } else {
+                                                    Image(systemName: SecretKeys.iconAppWindowCheckmark)
+                                                        .font(.title2)
+                                                        .foregroundStyle(Color.primary)
+                                                }
 
-                                        Text(app.name)
-                                            .font(.headline)
+                                                Text(app.name)
+                                                    .font(.headline)
+                                            }
+                                            .contentShape(Rectangle())
+                                        }
                                     }
-                                    .contentShape(Rectangle())
+                                } header: {
+                                    Text(SecretKeys.textSelectGameSection)
                                 }
                             }
-                        } header: {
-                            Text(SecretKeys.textSelectGameSection)
+                            .listStyle(.plain)
                         }
                     }
-                    .listStyle(.plain)
                     .navigationTitle(SecretKeys.textHomeNavigationTitle)
                     .navigationBarTitleDisplayMode(.large)
+                    .toolbar {
+                        // 🟢 ปุ่มรีเฟรชที่มุมขวาบน
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button {
+                                Task {
+                                    await fetchTargetGames()
+                                }
+                            } label: {
+                                Image(systemName: SecretKeys.iconRefresh)
+                            }
+                            .disabled(isLoading)
+                            .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
+                        }
+                    }
                     .navigationDestination(for: TargetGameApp.self) { app in
                         QuickApplyView(selectedApp: app)
                     }
@@ -76,19 +107,47 @@ struct TargetGameView: View {
     private func fetchTargetGames() async {
         guard let url = targetGamesURL else { return }
         
+        await MainActor.run {
+            self.isLoading = true
+            HUDHelper.show(message: "")
+        }
+
+        let startTime = Date()
+
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+            var request = URLRequest(
+                url: url,
+                cachePolicy: .reloadIgnoringLocalCacheData,
+                timeoutInterval: 15
+            )
+            request.httpMethod = "GET"
+            request.setValue(SecretKeys.userAgentValue, forHTTPHeaderField: SecretKeys.userAgentHeader)
+
+            // 🟢 เปลี่ยนมาใช้ URLSession.pinned เพื่อความปลอดภัยผ่าน SSL Pinning Delegate
+            let (data, response) = try await URLSession.pinned.data(for: request)
+            
+            if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
                 let decodedGames = try JSONDecoder().decode([TargetGameApp].self, from: data)
                 
                 await MainActor.run {
-                    if !decodedGames.isEmpty {
-                        self.targetApps = decodedGames
-                    }
+                    self.targetApps = decodedGames
                 }
             }
         } catch {
             print("Failed to fetch target games: \(error.localizedDescription)")
+        }
+
+        // การันตีการแสดง HUD อย่างน้อย 1.0 วินาที เพื่อให้ประสบการณ์ผู้ใช้งานสม่ำเสมอ
+        let elapsedTime = Date().timeIntervalSince(startTime)
+        let minDuration: TimeInterval = 1.0
+        if elapsedTime < minDuration {
+            let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: remainingTime)
+        }
+
+        await MainActor.run {
+            self.isLoading = false
+            HUDHelper.hide()
         }
     }
 }
