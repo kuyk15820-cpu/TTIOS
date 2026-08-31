@@ -1,10 +1,28 @@
 import SwiftUI
 import UIKit
 
-struct TargetGameApp: Identifiable, Hashable {
-    let id = UUID()
+struct TargetGameApp: Identifiable, Hashable, Decodable {
+    var id: String { bundleID }
     let name: String
     let bundleID: String
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case bundleID
+    }
+
+    // MARK: - Decodable Initializer
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.bundleID = try container.decode(String.self, forKey: .bundleID)
+        
+        // ถ้าใน JSON มี field name ให้ใช้ค่านั้น ถ้าไม่มีหรือเป็นค่าว่าง ให้ใช้ระบบดึงชื่อแอปอัตโนมัติ
+        if let decodedName = try container.decodeIfPresent(String.self, forKey: .name), !decodedName.isEmpty {
+            self.name = decodedName
+        } else {
+            self.name = TargetGameApp.fetchAppName(for: self.bundleID)
+        }
+    }
 
     // Initializer สำหรับใส่ทั้ง name และ bundleID
     init(name: String, bundleID: String) {
