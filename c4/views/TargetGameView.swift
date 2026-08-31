@@ -72,11 +72,11 @@ struct TargetGameView: View {
                     .navigationTitle(SecretKeys.textHomeNavigationTitle)
                     .navigationBarTitleDisplayMode(.large)
                     .toolbar {
-                        // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ช่องทางเดียวสำหรับการรีเฟรช)
+                        // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ส่ง showHUD: true เพื่อให้แสดง HUD ตอนกดรีเฟรช)
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button {
                                 Task {
-                                    await fetchTargetGames()
+                                    await fetchTargetGames(showHUD: true)
                                 }
                             } label: {
                                 Image(systemName: SecretKeys.iconRefresh)
@@ -94,6 +94,7 @@ struct TargetGameView: View {
         .onAppear {
             updateManager.checkVersion()
             Task {
+                // 🟢 โหลดข้อมูลเมื่อเปิดหน้าจอขึ้นมา (showHUD เป็น false โดยดีฟอลต์)
                 await fetchTargetGames()
             }
         }
@@ -101,12 +102,14 @@ struct TargetGameView: View {
 
     // MARK: - Fetch Dynamic Games from Server
 
-    private func fetchTargetGames() async {
+    private func fetchTargetGames(showHUD: Bool = false) async {
         guard let url = targetGamesURL else { return }
         
         await MainActor.run {
             self.isLoading = true
-            HUDHelper.show(message: "")
+            if showHUD {
+                HUDHelper.show(message: "")
+            }
         }
 
         let startTime = Date()
@@ -144,17 +147,21 @@ struct TargetGameView: View {
             }
         }
 
-        // การันตีการแสดง HUD อย่างน้อย 1.0 วินาที เพื่อให้ประสบการณ์ผู้ใช้งานสม่ำเสมอ
-        let elapsedTime = Date().timeIntervalSince(startTime)
-        let minDuration: TimeInterval = 1.0
-        if elapsedTime < minDuration {
-            let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: remainingTime)
+        // หากมีการแสดง HUD ให้การันตีการแสดงอย่างน้อย 1.0 วินาที เพื่อความต่อเนื่องของ UI
+        if showHUD {
+            let elapsedTime = Date().timeIntervalSince(startTime)
+            let minDuration: TimeInterval = 1.0
+            if elapsedTime < minDuration {
+                let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: remainingTime)
+            }
         }
 
         await MainActor.run {
             self.isLoading = false
-            HUDHelper.hide()
+            if showHUD {
+                HUDHelper.hide()
+            }
         }
     }
 }
