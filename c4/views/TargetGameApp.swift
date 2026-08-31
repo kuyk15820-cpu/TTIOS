@@ -5,10 +5,12 @@ struct TargetGameApp: Identifiable, Hashable, Decodable {
     var id: String { bundleID }
     let name: String
     let bundleID: String
+    let active: Bool? // 🟢 เพิ่ม Property รับสถานะเปิด/ปิดใช้งานจาก JSON
 
     enum CodingKeys: String, CodingKey {
         case name
         case bundleID
+        case active
     }
 
     // MARK: - Decodable Initializer
@@ -21,18 +23,23 @@ struct TargetGameApp: Identifiable, Hashable, Decodable {
         } else {
             self.name = TargetGameApp.fetchAppName(for: self.bundleID)
         }
+
+        // หากฝั่ง Server ไม่ได้ส่งฟิลด์ active มา ให้ Default เป็น true
+        self.active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
     }
 
     // Initializer สำหรับใส่ทั้ง name และ bundleID
-    init(name: String, bundleID: String) {
+    init(name: String, bundleID: String, active: Bool? = true) {
         self.name = name
         self.bundleID = bundleID
+        self.active = active
     }
 
     // Initializer แบบระบุแค่ bundleID
-    init(bundleID: String) {
+    init(bundleID: String, active: Bool? = true) {
         self.bundleID = bundleID
         self.name = TargetGameApp.fetchAppName(for: bundleID)
+        self.active = active
     }
 
     var icon: UIImage? {
