@@ -32,16 +32,8 @@ struct TargetGameView: View {
                             Color.clear
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if targetApps.isEmpty {
-                            // โหลดเสร็จแล้วแต่ไม่มีรายการเกม -> แสดง Empty State
-                            VStack(spacing: 12) {
-                                Image(systemName: SecretKeys.iconEmptyState)
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.secondary)
-                                Text(SecretKeys.textNoPatchesFound)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            // 🟢 เรียกใช้ EmptyStateView ที่แยกไฟล์ไว้
+                            EmptyStateView()
                         } else {
                             // มีรายการเกม -> แสดง List
                             List {
