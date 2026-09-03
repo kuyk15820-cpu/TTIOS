@@ -141,5 +141,7 @@ keys:
 
   # TargetGameView Localized UI Strings & System Icons
   iconAppWindowCheckmark: "app.window.checkmark"
+  iconNoGame: "gamecontroller.slash"
   textSelectGameSection: "เลือกเกม"
   textHomeNavigationTitle: "หน้าแรก"
+  textNoGamesFound: "ไม่พบรายการเกม"
