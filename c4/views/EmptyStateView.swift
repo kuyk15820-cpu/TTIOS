@@ -1,15 +1,43 @@
 import SwiftUI
 
 struct EmptyStateView: View {
-    var iconName: String = SecretKeys.iconEmptyState
-    var title: String = SecretKeys.textNoPatchesFound
+    // 🟢 Enum สำหรับแบ่งประเภทการแสดงผลตามสถานะต่างๆ
+    enum EmptyType {
+        case noGames                               // ไม่พบรายการเกม
+        case noPatches                             // ไม่พบรายการ Patch
+        case custom(icon: String, title: String)   // กำหนด Icon และ Title เอง
+
+        var iconName: String {
+            switch self {
+            case .noGames:
+                return SecretKeys.iconNoGame
+            case .noPatches:
+                return SecretKeys.iconEmptyState
+            case .custom(let icon, _):
+                return icon
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .noGames:
+                return SecretKeys.textNoGamesFound
+            case .noPatches:
+                return SecretKeys.textNoPatchesFound
+            case .custom(_, let title):
+                return title
+            }
+        }
+    }
+
+    var type: EmptyType = .noPatches
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: iconName)
+            Image(systemName: type.iconName)
                 .font(.system(size: 40))
                 .foregroundColor(.secondary)
-            Text(title)
+            Text(type.title)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
@@ -21,7 +49,7 @@ struct EmptyStateView: View {
 
 #Preview {
     NavigationStack {
-        EmptyStateView()
+        EmptyStateView(type: .noGames)
             .navigationTitle("Target Games")
     }
 }
