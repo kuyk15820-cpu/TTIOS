@@ -32,8 +32,8 @@ struct TargetGameView: View {
                             Color.clear
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if targetApps.isEmpty {
-                            // 🟢 เรียกใช้ EmptyStateView ที่แยกไฟล์ไว้
-                            EmptyStateView()
+                            // 🟢 เรียกใช้ EmptyStateView แบบระบุ type: .noGames
+                            EmptyStateView(type: .noGames)
                         } else {
                             // มีรายการเกม -> แสดง List
                             List {
