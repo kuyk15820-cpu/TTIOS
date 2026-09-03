@@ -228,7 +228,24 @@ jobs:
             puts 'Added Swift Package: TrustKit'
           end
 
-          # 🟢 7. Sync ไฟล์ .swift, .m, .mm, .cpp และ .h เข้า Compile Sources และ Project
+          # 🟢 7. สั่งเพิ่ม Swift Package (IOSSecuritySuite)
+          ioss_url = 'https://github.com/securing/IOSSecuritySuite.git'
+          ioss_ref = project.root_object.package_references.find { |p| p.repositoryURL == ioss_url }
+          unless ioss_ref
+            ioss_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            ioss_ref.repositoryURL = ioss_url
+            ioss_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '2.2.0' }
+            project.root_object.package_references << ioss_ref
+            
+            ioss_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            ioss_product_dependency.product_name = 'IOSSecuritySuite'
+            ioss_product_dependency.package = ioss_ref
+            
+            target.package_product_dependencies << ioss_product_dependency
+            puts 'Added Swift Package: IOSSecuritySuite'
+          end
+
+          # 🟢 8. Sync ไฟล์ .swift, .m, .mm, .cpp และ .h เข้า Compile Sources และ Project
           source_phase = target.source_build_phase
           existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
 
