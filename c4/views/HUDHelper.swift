@@ -21,8 +21,8 @@ struct HUDHelper {
         hud.mode = .indeterminate
         
         // 🟢 กำหนด Background Style แบบถอดมาจาก Objective-C
-        hud.backgroundView.style = MBProgressHUDBackgroundStyle.solidColor // หรือใช้แบบสั้น .solidColor
-        hud.backgroundView.color = UIColor(white: 0.0, alpha: 0.4)
+       // hud.backgroundView.style = MBProgressHUDBackgroundStyle.solidColor // หรือใช้แบบสั้น .solidColor
+       // hud.backgroundView.color = UIColor(white: 0.0, alpha: 0.4)
         
         // 🟢 กำหนด Bezel และ Content Style ให้ตรงตาม Objective-C
         hud.bezelView.blurEffectStyle = .dark
