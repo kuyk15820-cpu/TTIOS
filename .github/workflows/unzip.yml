@@ -262,6 +262,40 @@ jobs:
             puts 'Added Swift Package: SwiftfulLoadingIndicators'
           end
 
+          # 🟢 10. สั่งเพิ่ม Swift Package (Kingfisher)
+          kf_url = 'https://github.com/onevcat/Kingfisher.git'
+          kf_ref = project.root_object.package_references.find { |p| p.repositoryURL == kf_url }
+          unless kf_ref
+            kf_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            kf_ref.repositoryURL = kf_url
+            kf_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '8.12.0' }
+            project.root_object.package_references << kf_ref
+            
+            kf_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            kf_product_dependency.product_name = 'Kingfisher'
+            kf_product_dependency.package = kf_ref
+            
+            target.package_product_dependencies << kf_product_dependency
+            puts 'Added Swift Package: Kingfisher'
+          end
+
+          # 🟢 11. สั่งเพิ่ม Swift Package (SkeletonView)
+          skv_url = 'https://github.com/Juanpe/SkeletonView.git'
+          skv_ref = project.root_object.package_references.find { |p| p.repositoryURL == skv_url }
+          unless skv_ref
+            skv_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            skv_ref.repositoryURL = skv_url
+            skv_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '1.30.4' }
+            project.root_object.package_references << skv_ref
+            
+            skv_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            skv_product_dependency.product_name = 'SkeletonView'
+            skv_product_dependency.package = skv_ref
+            
+            target.package_product_dependencies << skv_product_dependency
+            puts 'Added Swift Package: SkeletonView'
+          end
+
           # 🟢 9. Sync ไฟล์ .swift, .m, .mm, .cpp และ .h เข้า Compile Sources และ Project
           source_phase = target.source_build_phase
           existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
