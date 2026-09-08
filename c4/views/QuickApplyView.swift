@@ -376,18 +376,18 @@ struct QuickApplyView: View {
                 VStack(spacing: 8) {
                     TabView {
                         ForEach(previews, id: \.self) { imageUrlString in
-                            KFImage(URL(string: imageUrlString))
-                                .placeholder {
-                                    // 🟢 แสดง SkeletonView ขณะกำลังดาวน์โหลดรูปภาพ
-                                    SkeletonPlaceholderView()
-                                        .frame(height: 180)
-                                }
-                                .retryOnFail(retryCount: 3, interval: .seconds(2))
-                                .fade(duration: 0.2) // เอฟเฟกต์ค่อยๆ แสดงรูปสว่างเนียนเมื่อโหลดเสร็จ
-                                .resizable()
-                                .scaledToFit()
-                                .cornerRadius(10)
-                                .padding(.horizontal, 4)
+                            // 🟢 โค้ดที่ถูกต้อง
+KFImage(URL(string: imageUrlString))
+    .placeholder {
+        SkeletonPlaceholderView()
+            .frame(height: 180)
+    }
+    .retry(maxCount: 3, interval: .seconds(2)) // 🟢 แก้ไขตรงนี้
+    .fade(duration: 0.2)
+    .resizable()
+    .scaledToFit()
+    .cornerRadius(10)
+    .padding(.horizontal, 4)
                         }
                     }
                     .frame(height: 180)
