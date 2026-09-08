@@ -1,7 +1,6 @@
 import SwiftUI
 import UIKit
 import Network
-import SwiftfulLoadingIndicators
 
 // MARK: - Filter Bar Components
 
@@ -70,6 +69,9 @@ struct QuickApplyView: View {
     @StateObject private var viewModel: QuickApplyViewModel
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
+
+    // 🟢 เก็บ ID ของ Row ที่กำลังเปิดดู Preview รูปภาพ
+    @State private var expandedPreviewItemID: String? = nil
 
     // 🟢 ตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
     @State private var networkMonitor: NWPathMonitor?
@@ -227,68 +229,69 @@ struct QuickApplyView: View {
         let isSelected = viewModel.selectedItems.contains(item.id)
         let isServerActive = item.active ?? true
         let isDisabled = viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch
+        let isExpanded = expandedPreviewItemID == item.id
         
         let isRowProcessing = !isApplied && (
             viewModel.processingItemID == item.id 
             || (viewModel.isProcessingBatch && isSelected)
         )
 
-        Button {
-            guard !isDisabled else { return }
-            
-            if !isServerActive {
-                if isApplied {
-                    viewModel.handleToggleChange(item: item, enable: false)
+        VStack(spacing: 0) {
+            Button {
+                guard !isDisabled else { return }
+                
+                if !isServerActive {
+                    if isApplied {
+                        viewModel.handleToggleChange(item: item, enable: false)
+                    }
+                    return
                 }
-                return
-            }
 
-            if viewModel.isMultiSelectMode {
-                viewModel.toggleSelection(for: item)
-            } else {
-                viewModel.handleToggleChange(item: item, enable: !isApplied)
-            }
-        } label: {
-            HStack(alignment: .center, spacing: 10) {
                 if viewModel.isMultiSelectMode {
-                    Image(systemName: isSelected ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
-                        .font(.title3)
-                        .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                        .onTapGesture {
-                            guard !isDisabled && isServerActive else { return }
-                            viewModel.toggleSelection(for: item)
-                        }
+                    viewModel.toggleSelection(for: item)
+                } else {
+                    viewModel.handleToggleChange(item: item, enable: !isApplied)
                 }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(item.title)
-                            .font(.headline)
-                            .foregroundStyle(Color.primary)
+            } label: {
+                HStack(alignment: .center, spacing: 10) {
+                    if viewModel.isMultiSelectMode {
+                        Image(systemName: isSelected ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
+                            .font(.title3)
+                            .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                            .onTapGesture {
+                                guard !isDisabled && isServerActive else { return }
+                                viewModel.toggleSelection(for: item)
+                            }
                     }
 
-                    if let updatedAt = item.updatedAt, !updatedAt.isEmpty {
-                        HStack(spacing: 4) {
-                            Image(systemName: SecretKeys.iconClock)
-                                .font(.caption2)
-                            Text("\(SecretKeys.textUpdatePrefix)\(updatedAt.toRelativeTimeText)")
-                                .font(.subheadline)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text(item.title)
+                                .font(.headline)
+                                .foregroundStyle(Color.primary)
                         }
-                        .foregroundStyle(.secondary)
+
+                        if let updatedAt = item.updatedAt, !updatedAt.isEmpty {
+                            HStack(spacing: 4) {
+                                Image(systemName: SecretKeys.iconClock)
+                                    .font(.caption2)
+                                Text("\(SecretKeys.textUpdatePrefix)\(updatedAt.toRelativeTimeText)")
+                                    .font(.subheadline)
+                            }
+                            .foregroundStyle(.secondary)
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .opacity(isServerActive ? 1.0 : 0.35)
-                .grayscale(isServerActive ? 0.0 : 1.0)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .opacity(isServerActive ? 1.0 : 0.35)
+                    .grayscale(isServerActive ? 0.0 : 1.0)
 
-                Spacer(minLength: 4)
+                    Spacer(minLength: 4)
 
-                ZStack(alignment: .trailing) {
-                    // 🟢 เปลี่ยนจาก Spinner เดิม มาใช้ .text (Loading Text) ของ SwiftfulLoadingIndicators เวลาติดตั้ง/ประมวลผล Patch
-                    if isRowProcessing {
-                        LoadingIndicator(animation: .text, color: .accentColor, size: .small)
-                    } else {
+                    ZStack(alignment: .trailing) {
+                        ActivityIndicator(isAnimating: isRowProcessing, style: .medium)
+                            .opacity(isRowProcessing ? 1.0 : 0.0)
+
                         Group {
                             if !isServerActive {
                                 if isApplied {
@@ -309,37 +312,80 @@ struct QuickApplyView: View {
                                         .clipShape(Capsule())
                                 }
                             } else if isApplied {
-                                // 🟢 เพิ่ม Capsule ครอบสถานะ "ใช้งานอยู่" พร้อมเรียกใช้ .pulse สวยงามภายใน Capsule
-                                HStack(spacing: 5) {
-                                    LoadingIndicator(animation: .pulse, color: .green, size: .small)
-                                        .frame(width: 8, height: 8)
-                                    
-                                    Text(SecretKeys.textActiveState)
-                                        .font(.caption.bold())
-                                        .foregroundStyle(.green)
+                                Text(SecretKeys.textActiveState)
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                        .opacity(isRowProcessing ? 0.0 : 1.0)
+                    }
+                    .transaction { $0.animation = nil }
+
+                    // 🟢 ปุ่ม SF Control สำหรับเปิด/ปิด Preview สไลด์รูปภาพ
+                    if let previews = item.previewImages, !previews.isEmpty {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.28)) {
+                                if expandedPreviewItemID == item.id {
+                                    expandedPreviewItemID = nil
+                                } else {
+                                    expandedPreviewItemID = item.id
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(Color.green.opacity(0.12))
-                                .overlay(
-                                    Capsule()
-                                        .strokeBorder(Color.green.opacity(0.3), lineWidth: 1.0)
-                                )
-                                .clipShape(Capsule())
+                            }
+                        } label: {
+                            Image(systemName: isExpanded ? "chevron.up.circle.fill" : "photo.on.rectangle.angled")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(isExpanded ? AppTheme.accent : .secondary)
+                                .padding(6)
+                                .background(isExpanded ? AppTheme.accent.opacity(0.12) : Color.clear)
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .animation(.easeInOut(duration: 0.22), value: viewModel.isMultiSelectMode)
+            }
+            .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
+            .disabled(isDisabled || (!isServerActive && !isApplied))
+
+            // 🟢 ส่วนสไลด์ลงมาแสดง Preview Carousel รูปภาพ
+            if isExpanded, let previews = item.previewImages, !previews.isEmpty {
+                VStack(spacing: 8) {
+                    TabView {
+                        ForEach(previews, id: \.self) { imageUrlString in
+                            AsyncImage(url: URL(string: imageUrlString)) { phase in
+                                switch phase {
+                                case .empty:
+                                    ProgressView()
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFit()
+                                        .cornerRadius(10)
+                                        .padding(.horizontal, 4)
+                                case .failure:
+                                    Image(systemName: "photo")
+                                        .font(.largeTitle)
+                                        .foregroundColor(.secondary)
+                                @unknown default:
+                                    EmptyView()
+                                }
                             }
                         }
                     }
+                    .frame(height: 180)
+                    .tabViewStyle(.page)
+                    .indexViewStyle(.page(backgroundDisplayMode: .always))
                 }
-                .transaction { $0.animation = nil }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-            .animation(.easeInOut(duration: 0.22), value: viewModel.isMultiSelectMode)
         }
-        .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
-        .disabled(isDisabled || (!isServerActive && !isApplied))
     }
 
     // MARK: - Bottom Action Buttons
