@@ -251,7 +251,7 @@ jobs:
           unless sli_ref
             sli_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
             sli_ref.repositoryURL = sli_url
-            sli_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '0.0.5' }
+            sli_ref.requirement = { 'kind' => 'branch', 'branch' => 'main' }
             project.root_object.package_references << sli_ref
             
             sli_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
