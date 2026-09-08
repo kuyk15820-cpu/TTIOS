@@ -1,6 +1,26 @@
 import SwiftUI
 import UIKit
 import Network
+import Kingfisher
+import SkeletonView
+
+// MARK: - Skeleton UI Component for SwiftUI (Wrapper around SkeletonView)
+
+struct SkeletonPlaceholderView: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .systemGray5
+        view.layer.cornerRadius = 10
+        view.clipsToBounds = true
+        view.isSkeletonable = true
+        
+        // 🟢 เรียกใช้ SkeletonView สำหรับแสดง Gradient Animation ขณะกำลังโหลดรูปภาพ
+        view.showAnimatedGradientSkeleton()
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {}
+}
 
 // MARK: - Filter Bar Components
 
@@ -351,30 +371,23 @@ struct QuickApplyView: View {
             .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
             .disabled(isDisabled || (!isServerActive && !isApplied))
 
-            // 🟢 ส่วนสไลด์ลงมาแสดง Preview Carousel รูปภาพ
+            // 🟢 ส่วนสไลด์ลงมาแสดง Preview Carousel รูปภาพ (ใช้งาน Kingfisher + SkeletonView)
             if isExpanded, let previews = item.previewImages, !previews.isEmpty {
                 VStack(spacing: 8) {
                     TabView {
                         ForEach(previews, id: \.self) { imageUrlString in
-                            AsyncImage(url: URL(string: imageUrlString)) { phase in
-                                switch phase {
-                                case .empty:
-                                    ProgressView()
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFit()
-                                        .cornerRadius(10)
-                                        .padding(.horizontal, 4)
-                                case .failure:
-                                    Image(systemName: "photo")
-                                        .font(.largeTitle)
-                                        .foregroundColor(.secondary)
-                                @unknown default:
-                                    EmptyView()
+                            KFImage(URL(string: imageUrlString))
+                                .placeholder {
+                                    // 🟢 แสดง SkeletonView ขณะกำลังดาวน์โหลดรูปภาพ
+                                    SkeletonPlaceholderView()
+                                        .frame(height: 180)
                                 }
-                            }
+                                .retryOnFail(retryCount: 3, interval: .seconds(2))
+                                .fade(duration: 0.2) // เอฟเฟกต์ค่อยๆ แสดงรูปสว่างเนียนเมื่อโหลดเสร็จ
+                                .resizable()
+                                .scaledToFit()
+                                .cornerRadius(10)
+                                .padding(.horizontal, 4)
                         }
                     }
                     .frame(height: 180)
