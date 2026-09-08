@@ -1,27 +1,39 @@
 import SwiftUI
 import UIKit
 import Network
-import Kingfisher
-import SkeletonView
+import AVKit // 🟢 เพิ่ม AVKit สำหรับ Standard Native Video Player
 
-// MARK: - Skeleton UI Component for SwiftUI (Static Skeleton - ไม่มีอนิเมชัน)
+// MARK: - Standard Native Video Player View
 
-struct SkeletonPlaceholderView: UIViewRepresentable {
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        view.backgroundColor = UIColor.systemGray5
-        view.layer.cornerRadius = 10
-        view.clipsToBounds = true
-        view.isSkeletonable = true
-        
-        // 🟢 เรียก showSkeleton() เพื่อแสดง Skeleton นิ่งๆ ทันทีตั้งแต่แรกแบบไม่มีอนิเมชันวิ่ง
-        DispatchQueue.main.async {
-            view.showSkeleton()
+struct NativeVideoPlayerView: View {
+    let videoURL: URL
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        Group {
+            if let player = player {
+                // 🟢 ใช้ Native VideoPlayer ของ SwiftUI
+                VideoPlayer(player: player)
+                    .frame(height: 180)
+                    .cornerRadius(10)
+            } else {
+                Color.black
+                    .frame(height: 180)
+                    .cornerRadius(10)
+            }
         }
-        return view
+        .onAppear {
+            if player == nil {
+                let newPlayer = AVPlayer(url: videoURL)
+                self.player = newPlayer
+            }
+        }
+        .onDisappear {
+            // หยุดการเล่นวิดีโอทันทีเมื่อผู้ใช้พับ Preview หรือเลื่อนออกจากหน้าจอ
+            player?.pause()
+            player = nil
+        }
     }
-
-    func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
 // MARK: - Filter Bar Components
@@ -92,7 +104,7 @@ struct QuickApplyView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
 
-    // 🟢 เก็บ ID ของ Row ที่กำลังเปิดดู Preview รูปภาพ
+    // 🟢 เก็บ ID ของ Row ที่กำลังเปิดดู Preview วิดีโอ
     @State private var expandedPreviewItemID: String? = nil
 
     // 🟢 ตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
@@ -343,7 +355,7 @@ struct QuickApplyView: View {
                     }
                     .transaction { $0.animation = nil }
 
-                    // 🟢 ปุ่ม SF Control สำหรับเปิด/ปิด Preview สไลด์รูปภาพ
+                    // 🟢 ปุ่ม SF Control สำหรับเปิด/ปิด Preview สไลด์วิดีโอ
                     if let previews = item.previewImages, !previews.isEmpty {
                         Button {
                             withAnimation(.easeInOut(duration: 0.28)) {
@@ -354,7 +366,7 @@ struct QuickApplyView: View {
                                 }
                             }
                         } label: {
-                            Image(systemName: isExpanded ? "chevron.up.circle.fill" : "photo.on.rectangle.angled")
+                            Image(systemName: isExpanded ? "chevron.up.circle.fill" : "play.rectangle.fill")
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(isExpanded ? AppTheme.accent : .secondary)
                                 .padding(6)
@@ -373,24 +385,15 @@ struct QuickApplyView: View {
             .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
             .disabled(isDisabled || (!isServerActive && !isApplied))
 
-            // 🟢 ส่วนสไลด์ลงมาแสดง Preview Carousel รูปภาพ
-            if isExpanded, let previews = item.previewImages, !previews.isEmpty {
+            // 🟢 ส่วนสไลด์ลงมาแสดง Preview Carousel แบบ Standard Native Video Player
+            if isExpanded, let videoUrls = item.previewImages, !videoUrls.isEmpty {
                 VStack(spacing: 8) {
                     TabView {
-                        ForEach(previews, id: \.self) { imageUrlString in
-                            KFImage(URL(string: imageUrlString))
-                                .placeholder {
-                                    // 🟢 แสดง Static Skeleton ทันทีตั้งแต่แรกแบบไม่มีอนิเมชัน
-                                    SkeletonPlaceholderView()
-                                        .frame(height: 180)
-                                }
-                                .retry(maxCount: 3, interval: .seconds(2))
-                                .loadDiskFileSynchronously()
-                                .cacheOriginalImage()
-                                .resizable()
-                                .scaledToFit()
-                                .cornerRadius(10)
-                                .padding(.horizontal, 4)
+                        ForEach(videoUrls, id: \.self) { videoUrlString in
+                            if let url = URL(string: videoUrlString) {
+                                NativeVideoPlayerView(videoURL: url)
+                                    .padding(.horizontal, 4)
+                            }
                         }
                     }
                     .frame(height: 180)
