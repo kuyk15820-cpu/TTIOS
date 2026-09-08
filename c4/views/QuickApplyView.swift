@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import Network
+import SwiftfulLoadingIndicators
 
 // MARK: - Filter Bar Components
 
@@ -284,35 +285,50 @@ struct QuickApplyView: View {
                 Spacer(minLength: 4)
 
                 ZStack(alignment: .trailing) {
-                    ActivityIndicator(isAnimating: isRowProcessing, style: .medium)
-                        .opacity(isRowProcessing ? 1.0 : 0.0)
-
-                    Group {
-                        if !isServerActive {
-                            if isApplied {
-                                Text(SecretKeys.textRestorePatch)
-                                    .font(.subheadline.bold())
-                                    .foregroundStyle(.red)
-                            } else {
-                                Text(SecretKeys.textMaintenance)
-                                    .font(.caption2.bold())
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .foregroundStyle(.red)
-                                    .background(Color.clear)
-                                    .overlay(
-                                        Capsule()
-                                            .strokeBorder(Color.red, lineWidth: 1.0)
-                                    )
-                                    .clipShape(Capsule())
+                    // 🟢 เปลี่ยนจาก Spinner เดิม มาใช้ .text (Loading Text) ของ SwiftfulLoadingIndicators เวลาติดตั้ง/ประมวลผล Patch
+                    if isRowProcessing {
+                        LoadingIndicator(animation: .text, color: .accentColor, size: .small)
+                    } else {
+                        Group {
+                            if !isServerActive {
+                                if isApplied {
+                                    Text(SecretKeys.textRestorePatch)
+                                        .font(.subheadline.bold())
+                                        .foregroundStyle(.red)
+                                } else {
+                                    Text(SecretKeys.textMaintenance)
+                                        .font(.caption2.bold())
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .foregroundStyle(.red)
+                                        .background(Color.clear)
+                                        .overlay(
+                                            Capsule()
+                                                .strokeBorder(Color.red, lineWidth: 1.0)
+                                        )
+                                        .clipShape(Capsule())
+                                }
+                            } else if isApplied {
+                                // 🟢 เพิ่ม Capsule ครอบสถานะ "ใช้งานอยู่" พร้อมเรียกใช้ .pulse สวยงามภายใน Capsule
+                                HStack(spacing: 5) {
+                                    LoadingIndicator(animation: .pulse, color: .green, size: .small)
+                                        .frame(width: 8, height: 8)
+                                    
+                                    Text(SecretKeys.textActiveState)
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.green)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color.green.opacity(0.12))
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(Color.green.opacity(0.3), lineWidth: 1.0)
+                                )
+                                .clipShape(Capsule())
                             }
-                        } else if isApplied {
-                            Text(SecretKeys.textActiveState)
-                                .font(.subheadline.bold())
-                                .foregroundStyle(.green)
                         }
                     }
-                    .opacity(isRowProcessing ? 0.0 : 1.0)
                 }
                 .transaction { $0.animation = nil }
             }
