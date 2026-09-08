@@ -4,18 +4,20 @@ import Network
 import Kingfisher
 import SkeletonView
 
-// MARK: - Skeleton UI Component for SwiftUI (Wrapper around SkeletonView)
+// MARK: - Skeleton UI Component for SwiftUI (Static Skeleton - ไม่มีอนิเมชัน)
 
 struct SkeletonPlaceholderView: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
-        view.backgroundColor = .systemGray5
+        view.backgroundColor = UIColor.systemGray5
         view.layer.cornerRadius = 10
         view.clipsToBounds = true
         view.isSkeletonable = true
         
-        // 🟢 เรียกใช้ SkeletonView สำหรับแสดง Gradient Animation ขณะกำลังโหลดรูปภาพ
-        view.showAnimatedGradientSkeleton()
+        // 🟢 เรียก showSkeleton() เพื่อแสดง Skeleton นิ่งๆ ทันทีตั้งแต่แรกแบบไม่มีอนิเมชันวิ่ง
+        DispatchQueue.main.async {
+            view.showSkeleton()
+        }
         return view
     }
 
@@ -371,23 +373,24 @@ struct QuickApplyView: View {
             .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
             .disabled(isDisabled || (!isServerActive && !isApplied))
 
-            // 🟢 ส่วนสไลด์ลงมาแสดง Preview Carousel รูปภาพ (ใช้งาน Kingfisher + SkeletonView)
+            // 🟢 ส่วนสไลด์ลงมาแสดง Preview Carousel รูปภาพ
             if isExpanded, let previews = item.previewImages, !previews.isEmpty {
                 VStack(spacing: 8) {
                     TabView {
                         ForEach(previews, id: \.self) { imageUrlString in
-                            // 🟢 โค้ดที่ถูกต้อง
-KFImage(URL(string: imageUrlString))
-    .placeholder {
-        SkeletonPlaceholderView()
-            .frame(height: 180)
-    }
-    .retry(maxCount: 3, interval: .seconds(2)) // 🟢 แก้ไขตรงนี้
-    .fade(duration: 0.2)
-    .resizable()
-    .scaledToFit()
-    .cornerRadius(10)
-    .padding(.horizontal, 4)
+                            KFImage(URL(string: imageUrlString))
+                                .placeholder {
+                                    // 🟢 แสดง Static Skeleton ทันทีตั้งแต่แรกแบบไม่มีอนิเมชัน
+                                    SkeletonPlaceholderView()
+                                        .frame(height: 180)
+                                }
+                                .retry(maxCount: 3, interval: .seconds(2))
+                                .loadDiskFileSynchronously()
+                                .cacheOriginalImage()
+                                .resizable()
+                                .scaledToFit()
+                                .cornerRadius(10)
+                                .padding(.horizontal, 4)
                         }
                     }
                     .frame(height: 180)
