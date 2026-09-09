@@ -68,19 +68,6 @@ struct TargetGameView: View {
                     .navigationTitle(SecretKeys.textHomeNavigationTitle)
                     .navigationBarTitleDisplayMode(.large)
                     .toolbar {
-                        // 🌐 เปลี่ยนปุ่มฝั่งซ้ายเป็นเรียกใช้ FullScreenWebView
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            NavigationLink {
-                                FullScreenWebView()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "globe")
-                                    Text("Open Web")
-                                }
-                                .font(.subheadline)
-                            }
-                        }
-
                         // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ส่ง showHUD: true เพื่อแสดง HUD ตอนกดรีเฟรชเอง)
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button {
