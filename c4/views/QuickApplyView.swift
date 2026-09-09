@@ -159,7 +159,7 @@ struct QuickApplyView: View {
             }
         }
         .navigationTitle(viewModel.selectedApp.name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.accent)
         .toolbar {
             // Toolbar ปุ่ม Refresh
