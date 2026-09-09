@@ -8,79 +8,44 @@ struct FolderItem: Identifiable {
 }
 
 struct VoiceMemosHomeView: View {
+    @Environment(\.editMode) private var editMode
+    
     @State private var totalRecordingsCount: Int = 0
     @State private var recentlyDeletedCount: Int = 1
     
     @State private var customFolders: [FolderItem] = [
-        FolderItem(name: "🫠", count: 0),
-        FolderItem(name: "2", count: 0)
+        FolderItem(name: "ทดสอบ", count: 0),
+        FolderItem(name: "1", count: 0)
     ]
     
     @State private var isShowingNewFolderAlert = false
     @State private var folderName = ""
 
     var body: some View {
-        // 🟢 เอา NavigationStack ออกเพื่อไม่ให้ซ้อนกับ TargetGameView ปุ่ม BottomBar จะกลับมาแสดงผลทันที
         List {
             // Section 1: เสียงบันทึกทั้งหมด & ที่ลบล่าสุด
             Section {
-                NavigationLink(destination: AllRecordingsListView(title: "เสียงบันทึกทั้งหมด")) {
-                    HStack {
-                        Image(systemName: "waveform")
-                            .font(.title3)
-                            .foregroundColor(.blue)
-
-                        Text("เสียงบันทึกทั้งหมด")
-                            .font(.body)
-
-                        Spacer()
-
-                        Text("\(totalRecordingsCount)")
-                            .font(.callout)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                NavigationLink(destination: AllRecordingsListView(title: "ที่ลบล่าสุด")) {
-                    HStack {
-                        Image(systemName: "trash")
-                            .font(.title3)
-                            .foregroundColor(.blue)
-
-                        Text("ที่ลบล่าสุด")
-                            .font(.body)
-
-                        Spacer()
-
-                        Text("\(recentlyDeletedCount)")
-                            .font(.callout)
-                            .foregroundColor(.secondary)
-                    }
-                }
+                FolderRowView(title: "เสียงบันทึกทั้งหมด", iconName: "waveform", count: totalRecordingsCount)
+                FolderRowView(title: "ที่ลบล่าสุด", iconName: "trash", count: recentlyDeletedCount)
             }
             
             // Section 2: โฟลเดอร์ของฉัน
             if !customFolders.isEmpty {
                 Section(header: Text("โฟลเดอร์ของฉัน")) {
                     ForEach(customFolders) { folder in
-                        NavigationLink(destination: AllRecordingsListView(title: folder.name)) {
-                            HStack {
-                                Image(systemName: "folder")
-                                    .font(.title3)
-                                    .foregroundColor(.blue)
-
-                                Text(folder.name)
-                                    .font(.body)
-
-                                Spacer()
-
-                                Text("\(folder.count)")
-                                    .font(.callout)
-                                    .foregroundColor(.secondary)
+                        FolderRowView(title: folder.name, iconName: "folder", count: folder.count)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    withAnimation {
+                                        if let index = customFolders.firstIndex(where: { $0.id == folder.id }) {
+                                            customFolders.remove(at: index)
+                                        }
+                                    }
+                                } label: {
+                                    Image(systemName: "trash.fill") // 🟢 แสดงเป็นไอคอนถังขยะสีแดงตอนสไลด์
+                                }
                             }
-                        }
                     }
-                    // 🟢 ใช้ onDelete และ onMove ตามมาตรฐาน iOS Native (ลบ .swipeActions ออกเพื่อไม่ให้เกิดสีขาว)
                     .onDelete(perform: deleteFolder)
                     .onMove(perform: moveFolder)
                 }
@@ -135,6 +100,63 @@ struct VoiceMemosHomeView: View {
 
     private func moveFolder(from source: IndexSet, to destination: Int) {
         customFolders.move(fromOffsets: source, toOffset: destination)
+    }
+}
+
+// 🟢 Custom Row ที่เปลี่ยน UI ตามโหมดแก้ไขโดยอัตโนมัติ
+struct FolderRowView: View {
+    @Environment(\.editMode) private var editMode
+    let title: String
+    let iconName: String
+    let count: Int
+
+    var isEditing: Bool {
+        editMode?.wrappedValue.isEditing ?? false
+    }
+
+    var body: some View {
+        ZStack {
+            // NavigationLink แบบซ่อน Arrow มาตรฐาน เพื่อให้คลิกเปิดหน้าได้ปกติ
+            NavigationLink(destination: AllRecordingsListView(title: title)) {
+                EmptyView()
+            }
+            .opacity(0)
+
+            HStack {
+                // ไอคอนโฟลเดอร์ / Waveform
+                Image(systemName: iconName)
+                    .font(.title3)
+                    .foregroundColor(.blue)
+
+                Text(title)
+                    .font(.body)
+
+                Spacer()
+
+                if isEditing {
+                    // 🟢 ในโหมดแก้ไข: ซ่อนลูกศร > แล้วแสดงปุ่ม 3 จุด (...) แทน
+                    Button {
+                        // Action เมื่อกด 3 จุด
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundColor(.blue)
+                    }
+                } else {
+                    // 🟢 โหมดปกติ: แสดงจำนวน และลูกศร >
+                    HStack(spacing: 6) {
+                        Text("\(count)")
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .bold()
+                            .foregroundColor(Color(uiColor: .tertiaryLabel))
+                    }
+                }
+            }
+        }
     }
 }
 
