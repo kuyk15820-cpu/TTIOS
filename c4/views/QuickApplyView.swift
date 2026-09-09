@@ -1,40 +1,6 @@
 import SwiftUI
 import UIKit
 import Network
-import AVKit // 🟢 เพิ่ม AVKit สำหรับ Standard Native Video Player
-
-// MARK: - Standard Native Video Player View
-
-struct NativeVideoPlayerView: View {
-    let videoURL: URL
-    @State private var player: AVPlayer?
-
-    var body: some View {
-        Group {
-            if let player = player {
-                // 🟢 ใช้ Native VideoPlayer ของ SwiftUI
-                VideoPlayer(player: player)
-                    .frame(height: 180)
-                    .cornerRadius(10)
-            } else {
-                Color.black
-                    .frame(height: 180)
-                    .cornerRadius(10)
-            }
-        }
-        .onAppear {
-            if player == nil {
-                let newPlayer = AVPlayer(url: videoURL)
-                self.player = newPlayer
-            }
-        }
-        .onDisappear {
-            // หยุดการเล่นวิดีโอทันทีเมื่อผู้ใช้พับ Preview หรือเลื่อนออกจากหน้าจอ
-            player?.pause()
-            player = nil
-        }
-    }
-}
 
 // MARK: - Filter Bar Components
 
@@ -103,9 +69,6 @@ struct QuickApplyView: View {
     @StateObject private var viewModel: QuickApplyViewModel
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
-
-    // 🟢 เก็บ ID ของ Row ที่กำลังเปิดดู Preview วิดีโอ
-    @State private var expandedPreviewItemID: String? = nil
 
     // 🟢 ตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
     @State private var networkMonitor: NWPathMonitor?
@@ -263,148 +226,104 @@ struct QuickApplyView: View {
         let isSelected = viewModel.selectedItems.contains(item.id)
         let isServerActive = item.active ?? true
         let isDisabled = viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch
-        let isExpanded = expandedPreviewItemID == item.id
         
         let isRowProcessing = !isApplied && (
             viewModel.processingItemID == item.id 
             || (viewModel.isProcessingBatch && isSelected)
         )
 
-        VStack(spacing: 0) {
-            Button {
-                guard !isDisabled else { return }
-                
-                if !isServerActive {
-                    if isApplied {
-                        viewModel.handleToggleChange(item: item, enable: false)
-                    }
-                    return
+        Button {
+            guard !isDisabled else { return }
+            
+            if !isServerActive {
+                if isApplied {
+                    viewModel.handleToggleChange(item: item, enable: false)
                 }
+                return
+            }
 
+            if viewModel.isMultiSelectMode {
+                viewModel.toggleSelection(for: item)
+            } else {
+                viewModel.handleToggleChange(item: item, enable: !isApplied)
+            }
+        } label: {
+            HStack(alignment: .center, spacing: 10) {
                 if viewModel.isMultiSelectMode {
-                    viewModel.toggleSelection(for: item)
-                } else {
-                    viewModel.handleToggleChange(item: item, enable: !isApplied)
+                    Image(systemName: isSelected ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
+                        .font(.title3)
+                        .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                        .onTapGesture {
+                            guard !isDisabled && isServerActive else { return }
+                            viewModel.toggleSelection(for: item)
+                        }
                 }
-            } label: {
-                HStack(alignment: .center, spacing: 10) {
-                    if viewModel.isMultiSelectMode {
-                        Image(systemName: isSelected ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
-                            .font(.title3)
-                            .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                            .onTapGesture {
-                                guard !isDisabled && isServerActive else { return }
-                                viewModel.toggleSelection(for: item)
-                            }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(item.title)
+                            .font(.headline)
+                            .foregroundStyle(Color.primary)
                     }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Text(item.title)
-                                .font(.headline)
-                                .foregroundStyle(Color.primary)
+                    if let updatedAt = item.updatedAt, !updatedAt.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: SecretKeys.iconClock)
+                                .font(.caption2)
+                            Text("\(SecretKeys.textUpdatePrefix)\(updatedAt.toRelativeTimeText)")
+                                .font(.subheadline)
                         }
-
-                        if let updatedAt = item.updatedAt, !updatedAt.isEmpty {
-                            HStack(spacing: 4) {
-                                Image(systemName: SecretKeys.iconClock)
-                                    .font(.caption2)
-                                Text("\(SecretKeys.textUpdatePrefix)\(updatedAt.toRelativeTimeText)")
-                                    .font(.subheadline)
-                            }
-                            .foregroundStyle(.secondary)
-                        }
+                        .foregroundStyle(.secondary)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .opacity(isServerActive ? 1.0 : 0.35)
-                    .grayscale(isServerActive ? 0.0 : 1.0)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .opacity(isServerActive ? 1.0 : 0.35)
+                .grayscale(isServerActive ? 0.0 : 1.0)
 
-                    Spacer(minLength: 4)
+                Spacer(minLength: 4)
 
-                    ZStack(alignment: .trailing) {
-                        ActivityIndicator(isAnimating: isRowProcessing, style: .medium)
-                            .opacity(isRowProcessing ? 1.0 : 0.0)
+                ZStack(alignment: .trailing) {
+                    ActivityIndicator(isAnimating: isRowProcessing, style: .medium)
+                        .opacity(isRowProcessing ? 1.0 : 0.0)
 
-                        Group {
-                            if !isServerActive {
-                                if isApplied {
-                                    Text(SecretKeys.textRestorePatch)
-                                        .font(.subheadline.bold())
-                                        .foregroundStyle(.red)
-                                } else {
-                                    Text(SecretKeys.textMaintenance)
-                                        .font(.caption2.bold())
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 3)
-                                        .foregroundStyle(.red)
-                                        .background(Color.clear)
-                                        .overlay(
-                                            Capsule()
-                                                .strokeBorder(Color.red, lineWidth: 1.0)
-                                        )
-                                        .clipShape(Capsule())
-                                }
-                            } else if isApplied {
-                                Text(SecretKeys.textActiveState)
+                    Group {
+                        if !isServerActive {
+                            if isApplied {
+                                Text(SecretKeys.textRestorePatch)
                                     .font(.subheadline.bold())
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(.red)
+                            } else {
+                                Text(SecretKeys.textMaintenance)
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .foregroundStyle(.red)
+                                    .background(Color.clear)
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(Color.red, lineWidth: 1.0)
+                                    )
+                                    .clipShape(Capsule())
                             }
+                        } else if isApplied {
+                            Text(SecretKeys.textActiveState)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.green)
                         }
-                        .opacity(isRowProcessing ? 0.0 : 1.0)
                     }
-                    .transaction { $0.animation = nil }
-
-                    // 🟢 ปุ่ม SF Control สำหรับเปิด/ปิด Preview สไลด์วิดีโอ
-                    if let previews = item.previewImages, !previews.isEmpty {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.28)) {
-                                if expandedPreviewItemID == item.id {
-                                    expandedPreviewItemID = nil
-                                } else {
-                                    expandedPreviewItemID = item.id
-                                }
-                            }
-                        } label: {
-                            Image(systemName: isExpanded ? "chevron.up.circle.fill" : "play.rectangle.fill")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(isExpanded ? AppTheme.accent : .secondary)
-                                .padding(6)
-                                .background(isExpanded ? AppTheme.accent.opacity(0.12) : Color.clear)
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    .opacity(isRowProcessing ? 0.0 : 1.0)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-                .animation(.easeInOut(duration: 0.22), value: viewModel.isMultiSelectMode)
+                .transaction { $0.animation = nil }
             }
-            .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
-            .disabled(isDisabled || (!isServerActive && !isApplied))
-
-            // 🟢 ส่วนสไลด์ลงมาแสดง Preview Carousel แบบ Standard Native Video Player
-            if isExpanded, let videoUrls = item.previewImages, !videoUrls.isEmpty {
-                VStack(spacing: 8) {
-                    TabView {
-                        ForEach(videoUrls, id: \.self) { videoUrlString in
-                            if let url = URL(string: videoUrlString) {
-                                NativeVideoPlayerView(videoURL: url)
-                                    .padding(.horizontal, 4)
-                            }
-                        }
-                    }
-                    .frame(height: 180)
-                    .tabViewStyle(.page)
-                    .indexViewStyle(.page(backgroundDisplayMode: .always))
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .animation(.easeInOut(duration: 0.22), value: viewModel.isMultiSelectMode)
         }
+        .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
+        .disabled(isDisabled || (!isServerActive && !isApplied))
     }
 
     // MARK: - Bottom Action Buttons
