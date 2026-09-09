@@ -15,18 +15,17 @@ struct TargetGameView: View {
     private let targetGamesURL = URL(string: SecretKeys.targetGamesURL)
 
     var body: some View {
-        // 🟢 ย้าย NavigationStack ออกมาอยู่นอกสุด เพื่อล็อกโครงสร้าง Layout ให้เสถียร ไม่ลอยทับ List
-        NavigationStack {
-            Group {
-                if updateManager.isUpdateNeeded {
-                    // 🟢 ถ้ามีอัปเดต ให้แสดงหน้า AppUpdateView
-                    AppUpdateView(
-                        downloadUrl: updateManager.downloadUrl,
-                        releaseNotes: updateManager.releaseNotes,
-                        versionString: updateManager.serverVersion
-                    )
-                } else {
-                    // 🔵 แสดงรายการเลือกเกมปกติ
+        Group {
+            if updateManager.isUpdateNeeded {
+                // 🟢 ถ้ามีอัปเดต ให้แสดงหน้า AppUpdateView ดีไซน์เต็มหน้า
+                AppUpdateView(
+                    downloadUrl: updateManager.downloadUrl,
+                    releaseNotes: updateManager.releaseNotes,
+                    versionString: updateManager.serverVersion
+                )
+            } else {
+                // 🔵 ถ้าไม่มีอัปเดต แสดงรายการเลือกเกมปกติ
+                NavigationStack {
                     Group {
                         if isLoading {
                             // ขณะกำลังโหลดข้อมูล -> ซ่อน List ทั้งหมด
@@ -66,29 +65,26 @@ struct TargetGameView: View {
                             .listStyle(.plain)
                         }
                     }
-                }
-            }
-            // 🟢 ย้าย Modifiers การตั้งค่า Navigation Bar มาไว้ระดับนอกสุด
-            .navigationTitle(updateManager.isUpdateNeeded ? "" : SecretKeys.textHomeNavigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !updateManager.isUpdateNeeded {
-                    // 🟢 ปุ่มรีเฟรชที่มุมขวาบน
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            Task {
-                                await fetchTargetGames(showHUD: true)
+                    .navigationTitle(SecretKeys.textHomeNavigationTitle)
+                    .navigationBarTitleDisplayMode(.large)
+                    .toolbar {
+                        // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ส่ง showHUD: true เพื่อแสดง HUD ตอนกดรีเฟรชเอง)
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button {
+                                Task {
+                                    await fetchTargetGames(showHUD: true)
+                                }
+                            } label: {
+                                Image(systemName: SecretKeys.iconRefresh)
                             }
-                        } label: {
-                            Image(systemName: SecretKeys.iconRefresh)
+                            .disabled(isLoading)
+                            .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
                         }
-                        .disabled(isLoading)
-                        .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
+                    }
+                    .navigationDestination(for: TargetGameApp.self) { app in
+                        QuickApplyView(selectedApp: app)
                     }
                 }
-            }
-            .navigationDestination(for: TargetGameApp.self) { app in
-                QuickApplyView(selectedApp: app)
             }
         }
         .onAppear {
