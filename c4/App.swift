@@ -18,7 +18,7 @@ struct ThreeOneOSFiveApp: App {
     private let monitorQueue = DispatchQueue(label: "NetworkMonitorQueue")
 
     init() {
-        // 🟢 เริ่มต้นตั้งค่า SSL Pinning ทันทีตั้งแต่เปิดแอป ก่อนเริ่ม Network หรือ UI ใดๆ
+        // 🟢 เริ่มต้นตั้งค่า SSL Pinning ทันทีตั้งแต่เปิดแอป
         LayoutMetricsHelper.shared.applyLayoutConstraints()
         
         setupLogCapture()
@@ -32,35 +32,34 @@ struct ThreeOneOSFiveApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                // 1. หน้าหลักของแอป
-                ContentView()
-                    .environmentObject(appState)
-                    .environmentObject(patchDraftCoordinator)
-                    .environmentObject(fileOperationCoordinator)
-                    .environment(\.appLanguage, language)
-                    .environment(\.locale, language.locale)
-                    .opacity(isCheckingUpdate ? 0 : 1)
-                    .allowsHitTesting(!showOnboarding && !isCheckingUpdate)
-
-                // 2. หน้า Splash Screen (แสดงผลค้างไว้จนกว่าจะเช็คเวอร์ชันสำเร็จ)
+                // 🟢 1. เปลี่ยนการสลับหน้าเป็น if-else แทนการใช้ .opacity(0) 
+                // เพื่อให้ ContentView เริ่มคำนวณ Safe Area หลังจาก Splash Screen ปิดลงอย่างแม่นยำ
                 if isCheckingUpdate {
                     AppSplashScreenView()
                         .transition(.opacity)
                         .zIndex(999)
-                }
+                } else {
+                    ContentView()
+                        .environmentObject(appState)
+                        .environmentObject(patchDraftCoordinator)
+                        .environmentObject(fileOperationCoordinator)
+                        .environment(\.appLanguage, language)
+                        .environment(\.locale, language.locale)
+                        .transition(.opacity)
 
-                // 3. หน้า Onboarding (แสดงผลหลังจากปิด Splash Screen หากยังตั้งค่าไม่เสร็จ)
-                if showOnboarding && !isCheckingUpdate {
-                    OnboardingView {
-                        OnboardingStore.markCompleted()
-                        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
-                            showOnboarding = false
+                    // 2. หน้า Onboarding (แสดงผลเมื่อปิด Splash Screen แล้วหากยังตั้งค่าไม่เสร็จ)
+                    if showOnboarding {
+                        OnboardingView {
+                            OnboardingStore.markCompleted()
+                            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                                showOnboarding = false
+                            }
                         }
+                        .environment(\.appLanguage, language)
+                        .environment(\.locale, language.locale)
+                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        .zIndex(1000)
                     }
-                    .environment(\.appLanguage, language)
-                    .environment(\.locale, language.locale)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                    .zIndex(1000)
                 }
             }
             .onAppear {
@@ -112,7 +111,7 @@ struct ThreeOneOSFiveApp: App {
                 
                 self.networkMonitor.cancel()
                 
-                // ปิด Splash Screen เพื่อสลับเข้าหน้าหลัก (TargetGameView จะสลับรายการแอปตาม isUpdateNeeded เอง)
+                // ปิด Splash Screen เพื่อสลับเข้าหน้าหลัก
                 withAnimation(.easeOut(duration: 0.3)) {
                     self.isCheckingUpdate = false
                 }
