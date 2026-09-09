@@ -68,6 +68,19 @@ struct TargetGameView: View {
                     .navigationTitle(SecretKeys.textHomeNavigationTitle)
                     .navigationBarTitleDisplayMode(.large)
                     .toolbar {
+                        // 🧪 ปุ่มสำหรับเปิดไปหน้า VoiceMemosHomeView เพื่อทดสอบ (มุมซ้ายบน)
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            NavigationLink {
+                                VoiceMemosHomeView()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "mic.fill")
+                                    Text("Open Voice")
+                                }
+                                .font(.subheadline)
+                            }
+                        }
+
                         // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ส่ง showHUD: true เพื่อแสดง HUD ตอนกดรีเฟรชเอง)
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button {
