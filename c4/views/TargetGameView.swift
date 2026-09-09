@@ -68,14 +68,14 @@ struct TargetGameView: View {
                     .navigationTitle(SecretKeys.textHomeNavigationTitle)
                     .navigationBarTitleDisplayMode(.large)
                     .toolbar {
-                        // 🧪 ปุ่มสำหรับเปิดไปหน้า VoiceMemosHomeView เพื่อทดสอบ (มุมซ้ายบน)
+                        // 🌐 เปลี่ยนปุ่มฝั่งซ้ายเป็นเรียกใช้ FullScreenWebView
                         ToolbarItem(placement: .navigationBarLeading) {
                             NavigationLink {
-                                VoiceMemosHomeView()
+                                FullScreenWebView()
                             } label: {
                                 HStack(spacing: 4) {
-                                    Image(systemName: "mic.fill")
-                                    Text("Open Voice")
+                                    Image(systemName: "globe")
+                                    Text("Open Web")
                                 }
                                 .font(.subheadline)
                             }
