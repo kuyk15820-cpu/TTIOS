@@ -6,10 +6,8 @@ struct FullScreenWebView: View {
     private let targetURL = URL(string: "https://chatgpt.com")!
 
     var body: some View {
-        ZStack {
-            InternalWebView(url: targetURL)
-                .ignoresSafeArea() // เต็มหน้าจอ ชิดขอบทุกด้าน
-        }
+        // 🟢 เอา ZStack และ .ignoresSafeArea() ออก เพื่อให้อยู่ในขอบเขต Safe Area ตามปกติ
+        InternalWebView(url: targetURL)
     }
 }
 
