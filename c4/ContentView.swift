@@ -31,10 +31,24 @@ struct ContentView: View {
     }
 
     var body: some View {
-        // 🟢 เรียก MainContainerView โดยตรง ตัด .onChange/.onAppear ที่รบกวน Paging State ออกทั้งหมด
-        MainContainerView()
+        TargetGameView()
             .tint(AppTheme.accent)
             .imageScale(.small)
+            .onChange(of: patchDraftCoordinator.request?.id) { requestID in
+                if requestID != nil { tabNavigation.select(AppSection.patches.rawValue) }
+            }
+            .onChange(of: patchDraftCoordinator.importRequest?.id) { requestID in
+                if requestID != nil { tabNavigation.select(AppSection.patches.rawValue) }
+            }
+            .onChange(of: cleanerEnabled) { _ in
+                tabNavigation.reconcileSelection(with: featureVisibility)
+            }
+            .onChange(of: wallpapersEnabled) { _ in
+                tabNavigation.reconcileSelection(with: featureVisibility)
+            }
+            .onAppear {
+                tabNavigation.reconcileSelection(with: featureVisibility)
+            }
     }
 
     // MARK: - Legacy Structure
@@ -100,7 +114,8 @@ struct ContentView: View {
         case .patches:
             PatchProjectsView()
         case .quickApply:
-            QuickApplyView(selectedApp: TargetGameApp(bundleID: "com.example.app"))
+            // 🟢 แก้ไข Error: ส่งค่า selectedApp ให้ QuickApplyView
+QuickApplyView(selectedApp: TargetGameApp(bundleID: "com.example.app"))
         default:
             EmptyView()
         }
@@ -166,7 +181,7 @@ private extension AppSection {
         case .home: return "tab.home"
         case .patches: return "tab.patches"
         case .quickApply: return "Quick Apply"
-        default: return ""
+        default: return "" // 🟢 แก้ไข Warning: ครอบคลุม case ทั้งหมดของ enum AppSection
         }
     }
 
@@ -175,7 +190,7 @@ private extension AppSection {
         case .home: return "house.fill"
         case .patches: return "shippingbox.fill"
         case .quickApply: return "bolt.shield.fill"
-        default: return "circle"
+        default: return "circle" // 🟢 แก้ไข Warning: ครอบคลุม case ทั้งหมดของ enum AppSection
         }
     }
 }
