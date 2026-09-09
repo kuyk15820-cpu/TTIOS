@@ -6,8 +6,12 @@ struct FullScreenWebView: View {
     private let targetURL = URL(string: "https://chatgpt.com")!
 
     var body: some View {
-        // 🟢 เอา ZStack และ .ignoresSafeArea() ออก เพื่อให้อยู่ในขอบเขต Safe Area ตามปกติ
-        InternalWebView(url: targetURL)
+        // 🟢 เพิ่ม NavigationStack ครอบเพื่อให้ Safe Area และ Layout ทำงานสมดุลกับ TargetGameView
+        NavigationStack {
+            InternalWebView(url: targetURL)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar(.hidden, for: .navigationBar) // ซ่อน Navigation Bar ไว้เพื่อให้แสดงเว็บได้เต็มพื้นที่
+        }
     }
 }
 
