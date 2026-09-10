@@ -115,6 +115,8 @@ struct LicenseLoginView: View {
                 if shouldExitOnAlertDismiss {
                     exit(0)
                 } else if shouldDismissOnSuccess {
+                    // อัปเดต AppStorage เมื่อผู้ใช้กด OK เพื่อให้ MainAppFlowView สลับไปหน้า TargetGameView
+                    storedKey = licenseKey.trimmingCharacters(in: .whitespacesAndNewlines)
                     dismiss()
                 }
             }
@@ -151,9 +153,8 @@ struct LicenseLoginView: View {
                         return
                     }
                     
-                    // บันทึก Key ลงในทั้ง LicenseManager และ AppStorage เพื่อสลับหน้า
+                    // บันทึกเฉพาะ LicenseManager ก่อน (ยังไม่อัปเดต storedKey เพื่อรอให้กด OK บน Alert)
                     LicenseManager.shared.savedKey = trimmedKey
-                    storedKey = trimmedKey
                     
                     let expiryText = result.expiry ?? "Unlimited"
                     presentAlert(
