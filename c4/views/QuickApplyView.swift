@@ -154,7 +154,7 @@ struct QuickApplyView: View {
                         }
                     }
                 }
-                .listStyle(.insetGrouped)
+                .listStyle(.plain)
             }
             
             // Bottom Controls
