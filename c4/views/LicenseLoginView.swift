@@ -221,8 +221,6 @@ struct CustomTextField: View {
 }
 
 // MARK: - Preview
-struct LicenseLoginView_Previews: PreviewProvider {
-    static var previews: View {
-        LicenseLoginView()
-    }
+#Preview {
+    LicenseLoginView()
 }
