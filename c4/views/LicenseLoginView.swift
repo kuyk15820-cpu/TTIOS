@@ -10,6 +10,9 @@ struct LicenseLoginView: View {
     @State private var licenseKey: String = ""
     @State private var isLoading: Bool = false
     
+    // เก็บ Key ที่ผ่านการตรวจสอบแล้วไว้ชั่วคราว (เพื่อรอให้ผู้ใช้กด OK บน Alert ก่อนเปลี่ยนหน้า)
+    @State private var verifiedKeyTemp: String = ""
+    
     // Alert State
     @State private var showAlert: Bool = false
     @State private var alertTitle: String = ""
@@ -115,8 +118,9 @@ struct LicenseLoginView: View {
                 if shouldExitOnAlertDismiss {
                     exit(0)
                 } else if shouldDismissOnSuccess {
-                    // อัปเดต AppStorage เมื่อผู้ใช้กด OK เพื่อให้ MainAppFlowView สลับไปหน้า TargetGameView
-                    storedKey = licenseKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // เมื่อกด OK ค่อยบันทึก Key เพื่อสลับหน้าไปยัง TargetGameView
+                    LicenseManager.shared.savedKey = verifiedKeyTemp
+                    storedKey = verifiedKeyTemp
                     dismiss()
                 }
             }
@@ -153,8 +157,8 @@ struct LicenseLoginView: View {
                         return
                     }
                     
-                    // บันทึกเฉพาะ LicenseManager ก่อน (ยังไม่อัปเดต storedKey เพื่อรอให้กด OK บน Alert)
-                    LicenseManager.shared.savedKey = trimmedKey
+                    // ฝาก Key ไว้ใน Variable ชั่วคราวก่อน (ยังไม่ลง AppStorage/LicenseManager)
+                    self.verifiedKeyTemp = trimmedKey
                     
                     let expiryText = result.expiry ?? "Unlimited"
                     presentAlert(
