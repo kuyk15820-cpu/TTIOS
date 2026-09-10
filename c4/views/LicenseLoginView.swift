@@ -4,6 +4,9 @@ struct LicenseLoginView: View {
     // MARK: - Properties
     @Environment(\.dismiss) private var dismiss
     
+    // โหลด/บันทึก Key ลง UserDefaults เพื่อซิงค์กับ MainAppFlowView
+    @AppStorage("saved_license_key") private var storedKey: String = ""
+    
     @State private var licenseKey: String = ""
     @State private var isLoading: Bool = false
     
@@ -143,11 +146,15 @@ struct LicenseLoginView: View {
                 if result.status {
                     if let daysLeft = result.daysLeft, daysLeft < 0 {
                         LicenseManager.shared.savedKey = nil
+                        storedKey = ""
                         presentAlert(title: "Key Expired", message: "Key นี้หมดอายุแล้ว")
                         return
                     }
                     
+                    // บันทึก Key ลงในทั้ง LicenseManager และ AppStorage เพื่อสลับหน้า
                     LicenseManager.shared.savedKey = trimmedKey
+                    storedKey = trimmedKey
+                    
                     let expiryText = result.expiry ?? "Unlimited"
                     presentAlert(
                         title: "Success",
@@ -156,6 +163,7 @@ struct LicenseLoginView: View {
                     )
                 } else {
                     LicenseManager.shared.savedKey = nil
+                    storedKey = ""
                     presentAlert(title: "Error", message: result.message ?? "License Key ไม่ถูกต้อง")
                 }
             } catch {
