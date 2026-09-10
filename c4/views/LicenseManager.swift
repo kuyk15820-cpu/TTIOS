@@ -47,6 +47,7 @@ final class LicenseManager {
             } else {
                 UserDefaults.standard.removeObject(forKey: keyStorage)
             }
+            UserDefaults.standard.synchronize()
         }
     }
     
@@ -73,15 +74,29 @@ final class LicenseManager {
     /// 2. ตรวจสอบและยืนยัน Key
     func verifyKey(_ key: String) async throws -> KeyValidationData {
         let urlString = "\(APIConfig.baseURL)?action=check&token=\(APIConfig.packageToken)&key=\(key)&uuid=\(deviceUUID)"
-        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
-        
-        let (data, _) = try await URLSession.shared.data(from: url)
-        let response = try JSONDecoder().decode(KeyValidationData.self, from: data)
-        
-        if let contact = response.contact {
-            self.contactLink = contact
+        guard let url = URL(string: urlString) else { 
+            self.savedKey = nil
+            throw URLError(.badURL) 
         }
         
-        return response
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let response = try JSONDecoder().decode(KeyValidationData.self, from: data)
+            
+            if let contact = response.contact {
+                self.contactLink = contact
+            }
+            
+            // หาก Server ตอบว่า Key ไม่ถูกต้อง, หมดอายุ หรือถูกลบ ให้ล้างค่าออกจากเครื่องทันที
+            if !response.status || (response.daysLeft ?? 0) < 0 || response.forceExit == true {
+                self.savedKey = nil
+            }
+            
+            return response
+        } catch {
+            // หากเกิด Network Error หรือ JSON Response ผิดปกติ ให้ล้าง Key ป้องกันการค้างใน Memory
+            self.savedKey = nil
+            throw error
+        }
     }
 }
