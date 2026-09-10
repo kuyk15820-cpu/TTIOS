@@ -23,6 +23,7 @@ struct MainAppFlowView: View {
                 TargetGameView()
             }
         }
+        .animation(.default, value: savedKey)
         .task {
             await validateInitialState()
         }
@@ -57,4 +58,10 @@ struct MainAppFlowView: View {
         
         isCheckingKey = false
     }
+}
+
+// MARK: - Preview
+#Preview {
+    MainAppFlowView()
+        .environmentObject(AppState())
 }
