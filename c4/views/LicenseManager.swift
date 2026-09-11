@@ -5,13 +5,15 @@ import UIKit
 struct InitData: Decodable {
     let status: Bool
     let contact: String?
-    let maintenance: Bool?
+    let maintenance: Int? // รองรับ Int (0 หรือ 1) จาก PHP
     let forceExit: Bool?
     let message: String?
+    let errCode: String?
 
     enum CodingKeys: String, CodingKey {
         case status, contact, maintenance, message
         case forceExit = "force_exit"
+        case errCode = "err_code"
     }
 }
 
@@ -22,11 +24,18 @@ struct KeyValidationData: Decodable {
     let daysLeft: Int?
     let contact: String?
     let forceExit: Bool?
+    
+    // 🟢 เพิ่มข้อมูลที่รองรับ PHP API ล่าสุด
+    let errCode: String?
+    let reason: String?
+    let banUntil: String?
 
     enum CodingKeys: String, CodingKey {
-        case status, message, expiry, contact
+        case status, message, expiry, contact, reason
         case daysLeft = "days_left"
         case forceExit = "force_exit"
+        case errCode = "err_code"
+        case banUntil = "ban_until"
     }
 }
 
@@ -60,21 +69,26 @@ final class LicenseManager {
     /// 1. เช็กสถานะ Server และ Maintenance
     func checkInit() async throws -> InitData {
         let urlString = "\(APIConfig.baseURL)?action=init&token=\(APIConfig.packageToken)"
-        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
+        guard let encodedString = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: encodedString) else { 
+            throw URLError(.badURL) 
+        }
         
         let (data, _) = try await URLSession.shared.data(from: url)
         let response = try JSONDecoder().decode(InitData.self, from: data)
         
         self.contactLink = response.contact
-        self.isMaintenance = response.maintenance ?? false
+        self.isMaintenance = (response.maintenance == 1)
         
         return response
     }
     
     /// 2. ตรวจสอบและยืนยัน Key
     func verifyKey(_ key: String) async throws -> KeyValidationData {
+        // 🟢 เพิ่ม Percent Encoding รองรับสัญลักษณ์พิเศษ เช่น '∞' ใน Lifetime Key
         let urlString = "\(APIConfig.baseURL)?action=check&token=\(APIConfig.packageToken)&key=\(key)&uuid=\(deviceUUID)"
-        guard let url = URL(string: urlString) else { 
+        guard let encodedString = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: encodedString) else { 
             self.savedKey = nil
             throw URLError(.badURL) 
         }
@@ -87,8 +101,9 @@ final class LicenseManager {
                 self.contactLink = contact
             }
             
-            // หาก Server ตอบว่า Key ไม่ถูกต้อง, หมดอายุ หรือถูกลบ ให้ล้างค่าออกจากเครื่องทันที
-            if !response.status || (response.daysLeft ?? 0) < 0 || response.forceExit == true {
+            // 🟢 ปรับการล้างคีย์: ยอมรับกรณี Lifetime Key (daysLeft = 99999)
+            // จะล้างค่าในเครื่องเฉพาะเมื่อ status เป็น false หรือถูกสั่ง force_exit เท่านั้น
+            if !response.status || response.forceExit == true {
                 self.savedKey = nil
             }
             
