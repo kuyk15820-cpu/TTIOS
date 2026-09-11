@@ -15,6 +15,13 @@ struct LicenseLoginView: View {
     @State private var alertTitle: String = ""
     @State private var alertMessage: String = ""
     @State private var shouldExitOnAlertDismiss: Bool = false
+    @State private var shouldNavigateOnAlertDismiss: Bool = false
+
+    // 🟢 ตรวจสอบสถานะของ App (Active/Background) สำหรับ Auto-Paste
+    @Environment(\.scenePhase) private var scenePhase
+
+    // 🟢 Prefix สำหรับตรวจสอบว่าคีย์มาจาก Package เดียวกัน (ปรับเปลี่ยนตามที่คุณต้องการ เช่น "PKG-")
+    private let packagePrefix: String = "PKG-"
 
     var body: some View {
         NavigationStack {
@@ -37,12 +44,11 @@ struct LicenseLoginView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white)
                         
-                        // 🟢 1. เปลี่ยน Placeholder ให้เป็นตัวอย่างคีย์แบบใหม่
                         CustomTextField(placeholder: "Eg: PKG-dynamic-1234567890", text: $licenseKey)
                         
                         // 🟢 ปุ่ม Paste Key จาก Clipboard
                         Button(action: {
-                            handlePasteFromClipboard()
+                            handlePasteFromClipboard(isAutoPaste: false)
                         }) {
                             HStack(spacing: 6) {
                                 Image(systemName: "doc.on.clipboard")
@@ -116,6 +122,15 @@ struct LicenseLoginView: View {
                     self.licenseKey = storedKey
                 } else if let saved = LicenseManager.shared.savedKey {
                     self.licenseKey = saved
+                } else {
+                    // 🟢 ตรวจสอบและวางคีย์จาก Clipboard อัตโนมัติเมื่อเปิดหน้าเข้ามาครั้งแรก
+                    autoCheckAndPasteClipboard()
+                }
+            }
+            .onChange(of: scenePhase) { newPhase in
+                // 🟢 ตรวจสอบคีย์อัตโนมัติเมื่อผู้ใช้สลับแอปกลับมา
+                if newPhase == .active && licenseKey.isEmpty {
+                    autoCheckAndPasteClipboard()
                 }
             }
             .navigationDestination(isPresented: $navigateToGame) {
@@ -126,6 +141,9 @@ struct LicenseLoginView: View {
                 Button("OK", role: .cancel) {
                     if shouldExitOnAlertDismiss {
                         exit(0)
+                    } else if shouldNavigateOnAlertDismiss {
+                        // 🟢 ไปหน้าเกมหลังจากผู้ใช้กด OK บน Alert
+                        self.navigateToGame = true
                     }
                 }
             } message: {
@@ -136,21 +154,35 @@ struct LicenseLoginView: View {
     
     // MARK: - Actions
     
-    /// 🟢 2. ปรับการ Paste จาก Clipboard รองรับคีย์ยืดหยุ่น (ไม่ตัดขีด - หรือสัญลักษณ์พิเศษออก)
-    private func handlePasteFromClipboard() {
+    /// 🟢 เช็ก Clipboard อัตโนมัติ
+    private func autoCheckAndPasteClipboard() {
+        handlePasteFromClipboard(isAutoPaste: true)
+    }
+
+    /// 🟢 อ่านข้อความจาก Clipboard และตรวจสอบว่ามาจาก Package เดียวกันหรือไม่
+    private func handlePasteFromClipboard(isAutoPaste: Bool) {
         guard let clipboardText = UIPasteboard.general.string, !clipboardText.isEmpty else {
-            presentAlert(title: "Clipboard", message: "ไม่พบข้อความใน Clipboard")
+            if !isAutoPaste {
+                presentAlert(title: "Clipboard", message: "ไม่พบข้อความใน Clipboard")
+            }
             return
         }
         
         let trimmed = clipboardText.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // เช็กความยาวคีย์ยืดหยุ่น (ระหว่าง 5 ถึง 50 ตัวอักษร)
-        if trimmed.count >= 5 && trimmed.count <= 50 {
-            self.licenseKey = trimmed
-            handleActivateKey()
+        // กรองเฉพาะคีย์ที่ขึ้นต้นด้วย Prefix ของ Package และมีความยาวที่ถูกต้อง
+        let isMatchingPackage = trimmed.hasPrefix(packagePrefix) && (trimmed.count >= 5 && trimmed.count <= 50)
+        
+        if isMatchingPackage {
+            if self.licenseKey != trimmed {
+                self.licenseKey = trimmed
+                handleActivateKey()
+            }
         } else {
-            presentAlert(title: "Key ไม่ถูกต้อง", message: "ข้อความที่คัดลอกมาไม่ตรงกับรูปแบบ License Key")
+            // แจ้งเตือนเมื่อผู้ใช้เป็นคนกดปุ่ม Paste เองแต่คีย์ไม่ตรง Package
+            if !isAutoPaste {
+                presentAlert(title: "Key ไม่ถูกต้อง", message: "ข้อความใน Clipboard ไม่ใช่ License Key ของแพ็กเกจนี้")
+            }
         }
     }
     
@@ -174,19 +206,37 @@ struct LicenseLoginView: View {
                 }
                 
                 if result.status {
-                    // 🟢 3. ตัดการเช็ก daysLeft < 0 ออกที่ฝั่งแอป (ให้เซิร์ฟเวอร์เป็นคนตัดสิน)
-                    // บันทึก Key ไว้ใช้สำหรับครั้งถัดไป
+                    // บันทึก Key ไว้ใช้งานครั้งถัดไป
                     LicenseManager.shared.savedKey = trimmedKey
                     storedKey = trimmedKey
                     
-                    // นำทางไปหน้า TargetGameView
+                    // 🟢 สร้างข้อความแสดงวันหมดอายุ
+                    let expiryText = result.expiry ?? "Unlimited"
+                    let daysText: String
+                    
+                    if let days = result.daysLeft {
+                        if days >= 99999 || expiryText.lowercased() == "lifetime" {
+                            daysText = "ตลอดชีพ (Lifetime)"
+                        } else {
+                            daysText = "\(days) วัน"
+                        }
+                    } else {
+                        daysText = "ไม่ระบุ"
+                    }
+                    
+                    let successMessage = "เปิดใช้งานสำเร็จ!\n\nวันหมดอายุ: \(expiryText)\nคงเหลือ: \(daysText)"
+                    
+                    // 🟢 แสดง Alert แจ้งวันหมดอายุ แล้วจึงนำทางไปหน้าเกมเมื่อกด OK
                     await MainActor.run {
-                        self.navigateToGame = true
+                        presentAlert(
+                            title: "Activation Success",
+                            message: successMessage,
+                            shouldNavigate: true
+                        )
                     }
                 } else {
                     clearSavedKey()
                     
-                    // 🟢 4. แสดงข้อความแจ้งเตือนตาม Error Code จากเซิร์ฟเวอร์
                     var errorMessage = result.message ?? "License Key ไม่ถูกต้อง"
                     
                     if result.errCode == "KEY_BANNED" {
@@ -218,10 +268,11 @@ struct LicenseLoginView: View {
         UIApplication.shared.open(url)
     }
     
-    private func presentAlert(title: String, message: String, shouldExit: Bool = false) {
+    private func presentAlert(title: String, message: String, shouldExit: Bool = false, shouldNavigate: Bool = false) {
         self.alertTitle = title
         self.alertMessage = message
         self.shouldExitOnAlertDismiss = shouldExit
+        self.shouldNavigateOnAlertDismiss = shouldNavigate
         self.showAlert = true
     }
 }
