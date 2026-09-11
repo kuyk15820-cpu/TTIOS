@@ -37,7 +37,21 @@ struct LicenseLoginView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white)
                         
-                        CustomTextField(placeholder: "Eg: XXXX-XXXX-XXXX-XXXX", text: $licenseKey)
+                        // 🟢 1. เปลี่ยน Placeholder ให้เป็นตัวอย่างคีย์แบบใหม่
+                        CustomTextField(placeholder: "Eg: PKG-dynamic-1234567890", text: $licenseKey)
+                        
+                        // 🟢 ปุ่ม Paste Key จาก Clipboard
+                        Button(action: {
+                            handlePasteFromClipboard()
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.on.clipboard")
+                                Text("Paste Key from Clipboard")
+                            }
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color(red: 0.6, green: 0.95, blue: 0.3)) // Neon Green Accent
+                        }
+                        .padding(.top, 6)
                     }
                     .padding(.top, 36)
                     .padding(.horizontal, 24)
@@ -121,6 +135,25 @@ struct LicenseLoginView: View {
     }
     
     // MARK: - Actions
+    
+    /// 🟢 2. ปรับการ Paste จาก Clipboard รองรับคีย์ยืดหยุ่น (ไม่ตัดขีด - หรือสัญลักษณ์พิเศษออก)
+    private func handlePasteFromClipboard() {
+        guard let clipboardText = UIPasteboard.general.string, !clipboardText.isEmpty else {
+            presentAlert(title: "Clipboard", message: "ไม่พบข้อความใน Clipboard")
+            return
+        }
+        
+        let trimmed = clipboardText.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // เช็กความยาวคีย์ยืดหยุ่น (ระหว่าง 5 ถึง 50 ตัวอักษร)
+        if trimmed.count >= 5 && trimmed.count <= 50 {
+            self.licenseKey = trimmed
+            handleActivateKey()
+        } else {
+            presentAlert(title: "Key ไม่ถูกต้อง", message: "ข้อความที่คัดลอกมาไม่ตรงกับรูปแบบ License Key")
+        }
+    }
+    
     private func handleActivateKey() {
         let trimmedKey = licenseKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedKey.isEmpty else {
@@ -141,13 +174,8 @@ struct LicenseLoginView: View {
                 }
                 
                 if result.status {
-                    if let daysLeft = result.daysLeft, daysLeft < 0 {
-                        clearSavedKey()
-                        presentAlert(title: "Key Expired", message: "Key นี้หมดอายุแล้ว")
-                        return
-                    }
-                    
-                    // บันทึก Key ไว้ใช้เป็นความจำสำหรับครั้งถัดไป
+                    // 🟢 3. ตัดการเช็ก daysLeft < 0 ออกที่ฝั่งแอป (ให้เซิร์ฟเวอร์เป็นคนตัดสิน)
+                    // บันทึก Key ไว้ใช้สำหรับครั้งถัดไป
                     LicenseManager.shared.savedKey = trimmedKey
                     storedKey = trimmedKey
                     
@@ -157,7 +185,17 @@ struct LicenseLoginView: View {
                     }
                 } else {
                     clearSavedKey()
-                    presentAlert(title: "Error", message: result.message ?? "License Key ไม่ถูกต้อง")
+                    
+                    // 🟢 4. แสดงข้อความแจ้งเตือนตาม Error Code จากเซิร์ฟเวอร์
+                    var errorMessage = result.message ?? "License Key ไม่ถูกต้อง"
+                    
+                    if result.errCode == "KEY_BANNED" {
+                        let reason = result.reason ?? "ละเมิดข้อตกลง"
+                        let banUntil = result.banUntil ?? "ถาวร"
+                        errorMessage = "คีย์ถูกระงับการใช้งาน\nสาเหตุ: \(reason)\nระยะเวลา: \(banUntil)"
+                    }
+                    
+                    presentAlert(title: "Error", message: errorMessage)
                 }
             } catch {
                 isLoading = false
