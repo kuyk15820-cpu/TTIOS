@@ -29,11 +29,11 @@ struct MainTabView: View {
 }
 
 // MARK: - App Entry Point
-@main
-struct AdminDashboardApp: App {
-    var body: some Scene {
-        WindowGroup {
-            MainTabView()
-        }
-    }
-}
+// @main
+// struct AdminDashboardApp: App {
+//    var body: some Scene {
+//        WindowGroup {
+//            MainTabView()
+//        }
+//    }
+// }
