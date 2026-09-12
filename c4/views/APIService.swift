@@ -24,7 +24,7 @@ class APIService {
     static let shared = APIService()
     
     // ⚠️ เปลี่ยน URL ตรงนี้ให้ตรงกับ Domain/Host จริงของคุณ
-    private let baseURL = "https://thsv7.hostatom.com" 
+    private let baseURL = "https://f1x3r.org/api/webserver" 
     
     private init() {}
     
