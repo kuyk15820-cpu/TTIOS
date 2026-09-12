@@ -46,9 +46,6 @@ struct PackageListView: View {
                     if filteredProjects.isEmpty {
                         //ContentUnavailableView("ไม่พบข้อมูล Package", systemImage: "folder.badge.minus")
 
-// ❌ ของเดิม
-ContentUnavailableView("ไม่พบข้อมูล Package", systemImage: "folder.badge.minus")
-
 // 🟢 แก้เป็น
 VStack(spacing: 12) {
     Image(systemName: "folder.badge.minus")
