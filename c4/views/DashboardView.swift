@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct DashboardView: View {
+struct DashboardViews: View {
     @StateObject private var viewModel = DashboardViewModel()
     
     // ตั้งค่า Columns สำหรับ Grid Card Layout
@@ -149,5 +149,5 @@ struct StatCard: View {
 }
 
 #Preview {
-    DashboardView()
+    DashboardViews()
 }
