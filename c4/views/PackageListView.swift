@@ -44,7 +44,22 @@ struct PackageListView: View {
                 // MARK: - Main Package List
                 List {
                     if filteredProjects.isEmpty {
-                        ContentUnavailableView("ไม่พบข้อมูล Package", systemImage: "folder.badge.minus")
+                        //ContentUnavailableView("ไม่พบข้อมูล Package", systemImage: "folder.badge.minus")
+
+// ❌ ของเดิม
+ContentUnavailableView("ไม่พบข้อมูล Package", systemImage: "folder.badge.minus")
+
+// 🟢 แก้เป็น
+VStack(spacing: 12) {
+    Image(systemName: "folder.badge.minus")
+        .font(.largeTitle)
+        .foregroundColor(.secondary)
+    Text("ไม่พบข้อมูล Package")
+        .font(.subheadline)
+        .foregroundColor(.secondary)
+}
+.frame(maxWidth: .infinity, minHeight: 200)
+
                     } else {
                         ForEach(filteredProjects) { project in
                             ProjectRowCell(
