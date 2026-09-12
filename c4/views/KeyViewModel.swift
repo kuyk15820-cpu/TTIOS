@@ -100,7 +100,8 @@ class KeyViewModel: ObservableObject {
 
     func resetAllDevices() async {
         do {
-            let success = try meOrApiServiceResetAll()
+            let success = try await meOrApiServiceResetAll()
+
             if success { await fetchKeys() }
         } catch {
             self.errorMessage = error.localizedDescription
