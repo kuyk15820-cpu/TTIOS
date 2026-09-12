@@ -31,7 +31,7 @@ struct ContentView: View {
     }
 
     var body: some View {
-        MainAppFlowView()
+        MainTabView()
             .tint(AppTheme.accent)
             .imageScale(.small)
             .onChange(of: patchDraftCoordinator.request?.id) { requestID in
