@@ -51,7 +51,18 @@ struct KeyListView: View {
                 // MARK: - Main Key List
                 List {
                     if filteredKeys.isEmpty {
-                        ContentUnavailableView("ไม่พบข้อมูล License Key", systemImage: "key.slash")
+                        //ContentUnavailableView("ไม่พบข้อมูล License Key", systemImage: "key.slash")
+
+VStack(spacing: 12) {
+    Image(systemName: "key.slash")
+        .font(.largeTitle)
+        .foregroundColor(.secondary)
+    Text("ไม่พบข้อมูล License Key")
+        .font(.subheadline)
+        .foregroundColor(.secondary)
+}
+.frame(maxWidth: .infinity, minHeight: 200)
+
                     } else {
                         ForEach(filteredKeys) { key in
                             KeyRowView(
