@@ -194,12 +194,11 @@ struct ProjectRowCell: View {
                 }
 
                 Text(project.projectToken)
-                    .font(.caption)
-                    .fontDesign(.monospaced)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(4)
+    .font(.system(.caption, design: .monospaced))
+    .padding(.horizontal, 6)
+    .padding(.vertical, 2)
+    .background(Color(.systemGray6))
+    .cornerRadius(4)
 
                 if let contact = project.contactLink, !contact.isEmpty, let url = URL(string: contact) {
                     Link(destination: url) {
