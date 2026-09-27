@@ -69,8 +69,7 @@ struct PatchProjectEditorView: View {
                     }
                 }
 
-                if existingProject != nil || !rules.isEmpty || !directories.isEmpty {
-                    Section {
+                Section {
                     ForEach(rules) { rule in
                         Button {
                             ruleEditor = PatchRuleEditorContext(rule: rule)
@@ -89,24 +88,22 @@ struct PatchProjectEditorView: View {
                     }
                     .onDelete { rules.remove(atOffsets: $0) }
 
-                        if existingProject != nil {
-                            Button {
-                                ruleEditor = PatchRuleEditorContext(rule: nil)
-                            } label: {
-                                Label(language.text("patch.add_rule"), systemImage: "plus.circle.fill")
-                            }
-                        }
-                        if !directories.isEmpty {
-                            LabeledContent(language.text("patch.folders")) {
-                                Text("\(directories.count)")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    } header: {
-                        Text(language.text("patch.captured_content"))
-                    } footer: {
-                        Text(language.text("patch.workspace_edit_footer"))
+                    Button {
+                        ruleEditor = PatchRuleEditorContext(rule: nil)
+                    } label: {
+                        Label(language.text("patch.add_rule"), systemImage: "plus.circle.fill")
                     }
+
+                    if !directories.isEmpty {
+                        LabeledContent(language.text("patch.folders")) {
+                            Text("\(directories.count)")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text(language.text("patch.captured_content"))
+                } footer: {
+                    Text(language.text("patch.workspace_edit_footer"))
                 }
 
                 Section {
