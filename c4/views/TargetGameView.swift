@@ -82,7 +82,7 @@ struct TargetGameView: View {
                         }
                     }
                     .navigationDestination(for: TargetGameApp.self) { app in
-                        QuickApplyView(selectedApp: app)
+                        PatchProjectsView(selectedApp: app)
                     }
                 }
             }
