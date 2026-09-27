@@ -82,8 +82,8 @@ struct TargetGameView: View {
                         }
                     }
                     .navigationDestination(for: TargetGameApp.self) { app in
-                        PatchProjectsView(selectedApp: app)
-                    }
+    PatchProjectsView() 
+}
                 }
             }
         }
