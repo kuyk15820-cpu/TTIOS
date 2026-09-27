@@ -63,44 +63,6 @@ struct CategoryTabButton: View {
     }
 }
 
-// MARK: - Native List Content Configuration Wrapper
-// ดึงสไตล์ Layout, Font, Spacing Standard ของ iOS Native (UICollectionViewListCell) มาใช้ใน SwiftUI
-
-struct NativeListRowContent: UIViewRepresentable {
-    let title: String
-    let detail: String?
-    let isServerActive: Bool
-
-    func makeUIView(context: Context) -> UIListContentView {
-        var config = UIListContentConfiguration.subtitleCell()
-        config.image = UIImage(systemName: "doc.fill")
-        config.imageProperties.tintColor = .secondaryLabel
-        return UIListContentView(configuration: config)
-    }
-
-    func updateUIView(_ uiView: UIListContentView, context: Context) {
-        var config = UIListContentConfiguration.subtitleCell()
-        
-        // ข้อความหลัก (Title)
-        config.text = title
-        config.textProperties.color = isServerActive ? .label : .secondaryLabel
-        
-        // ข้อความรอง (Subtitle)
-        if let detail = detail, !detail.isEmpty {
-            config.secondaryText = detail
-            config.secondaryTextProperties.color = .secondaryLabel
-        } else {
-            config.secondaryText = nil
-        }
-        
-        // ไอคอน Standard ด้านซ้าย
-        config.image = UIImage(systemName: "doc.fill")
-        config.imageProperties.tintColor = isServerActive ? .secondaryLabel : .tertiaryLabel
-        
-        uiView.configuration = config
-    }
-}
-
 // MARK: - QuickApplyView
 
 struct QuickApplyView: View {
@@ -108,6 +70,7 @@ struct QuickApplyView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
 
+    // 🟢 ตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
     @State private var networkMonitor: NWPathMonitor?
 
     init(selectedApp: TargetGameApp) {
@@ -127,9 +90,11 @@ struct QuickApplyView: View {
 
             // Main Content Area
             if viewModel.isLoadingCatalog {
+                // ขณะรีเฟรชหรือโหลดข้อมูล -> ซ่อน List ทั้งหมด
                 Color.clear
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.displayedPatches.isEmpty {
+                // โหลดเสร็จแล้วแต่ไม่มีข้อมูล -> แสดง Empty State
                 VStack(spacing: 12) {
                     Image(systemName: SecretKeys.iconEmptyState)
                         .font(.system(size: 40))
@@ -140,21 +105,52 @@ struct QuickApplyView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // Native SwiftUI List ร่วมกับ Multi-Selection State
-                List(selection: $viewModel.selectedItems) {
-                    Section {
-                        ForEach(viewModel.displayedPatches) { item in
-                            patchRow(for: item)
-                                .tag(item.id)
-                        }
-                    } header: {
+                // โหลดเสร็จและมีข้อมูล -> แสดง List
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Section Header สไตล์ Native List
                         HStack {
                             Text("\(SecretKeys.textActivePatchesPrefix)\(viewModel.activeDisplayedPatchesCount)\(SecretKeys.textActivePatchesSuffix)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
                             Spacer()
+                            
+                            // ปุ่มเลือกหลายรายการ
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.22)) {
+                                    viewModel.toggleSelectAll()
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: viewModel.isMultiSelectMode ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
+                                        .font(.caption)
+                                    Text(SecretKeys.textMultiSelect)
+                                        .font(.caption.bold())
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(viewModel.isMultiSelectMode ? AppTheme.accent.opacity(0.15) : Color.secondary.opacity(0.12))
+                                .foregroundColor(viewModel.isMultiSelectMode ? AppTheme.accent : .primary)
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                        .background(Color(.systemGroupedBackground))
+
+                        Divider()
+
+                        // Patch List Rows
+                        ForEach(viewModel.displayedPatches) { item in
+                            patchRow(for: item)
+                            Divider()
                         }
                     }
                 }
-                .listStyle(.plain)
+                .background(Color(.systemBackground))
             }
             
             // Bottom Controls
@@ -166,14 +162,11 @@ struct QuickApplyView: View {
         .navigationBarTitleDisplayMode(.large)
         .tint(AppTheme.accent)
         .toolbar {
-            // ปุ่ม Select / Done แบบ Native สไลด์ไอคอนวงกลมเลือกอัตโนมัติ
-            ToolbarItem(placement: .navigationBarTrailing) {
-                EditButton()
-            }
-
+            // Toolbar ปุ่ม Refresh
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     Task {
+                        // 🟢 ส่ง force: true และ showHUD: true เมื่อผู้ใช้กดรีเฟรชเอง
                         await viewModel.fetchCatalog(force: true, showHUD: true)
                     }
                 } label: {
@@ -184,12 +177,15 @@ struct QuickApplyView: View {
             }
         }
         .task {
+            // 🟢 โหลดข้อมูลครั้งแรกตามปกติ (แสดง HUD)
             await viewModel.fetchCatalog(showHUD: true)
         }
         .onAppear {
+            // 🟢 เริ่มดักจับการเชื่อมต่อเครือข่ายเมื่อหน้าจอแสดงผล
             startNetworkMonitoring()
         }
         .onDisappear {
+            // 🟢 ยกเลิกการดักจับเมื่อออกจากหน้าจอ
             stopNetworkMonitoring()
         }
     }
@@ -203,6 +199,8 @@ struct QuickApplyView: View {
         monitor.pathUpdateHandler = { path in
             if path.status == .satisfied {
                 Task { @MainActor in
+                    // 🟢 เมื่ออินเทอร์เน็ตกลับมา และข้อมูล Patch ยังว่างอยู่
+                    // สั่งดึงข้อมูลแบบเบื้องหลังโดยส่ง showHUD: false เพื่อไม่ให้ HUD เด้งกวนผู้ใช้
                     if self.viewModel.displayedPatches.isEmpty && !self.viewModel.isLoadingCatalog {
                         await self.viewModel.fetchCatalog(showHUD: false)
                     }
@@ -225,61 +223,16 @@ struct QuickApplyView: View {
     @ViewBuilder
     private func patchRow(for item: QuickPatchItem) -> some View {
         let isApplied = viewModel.activePatches[item.id] ?? false
+        let isSelected = viewModel.selectedItems.contains(item.id)
         let isServerActive = item.active ?? true
         let isDisabled = viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch
         
         let isRowProcessing = !isApplied && (
             viewModel.processingItemID == item.id 
-            || (viewModel.isProcessingBatch && viewModel.selectedItems.contains(item.id))
+            || (viewModel.isProcessingBatch && isSelected)
         )
 
-        let detailText = item.updatedAt.map { "\(SecretKeys.textUpdatePrefix)\($0.toRelativeTimeText)" }
-
-        HStack(spacing: 8) {
-            // ฝั่งซ้าย: ใช้ Native UIListContentView จัดการ Spacing & Typography
-            NativeListRowContent(
-                title: item.title,
-                detail: detailText,
-                isServerActive: isServerActive
-            )
-
-            Spacer(minLength: 4)
-
-            // ฝั่งขวา: สถานะการทำงาน / ปุ่มกด
-            ZStack(alignment: .trailing) {
-                ActivityIndicator(isAnimating: isRowProcessing, style: .medium)
-                    .opacity(isRowProcessing ? 1.0 : 0.0)
-
-                Group {
-                    if !isServerActive {
-                        if isApplied {
-                            Text(SecretKeys.textRestorePatch)
-                                .font(.footnote.bold())
-                                .foregroundStyle(.red)
-                        } else {
-                            Text(SecretKeys.textMaintenance)
-                                .font(.caption.bold())
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .foregroundStyle(.red)
-                                .overlay(
-                                    Capsule()
-                                        .strokeBorder(Color.red, lineWidth: 1.0)
-                                )
-                                .clipShape(Capsule())
-                        }
-                    } else if isApplied {
-                        Text(SecretKeys.textActiveState)
-                            .font(.footnote.bold())
-                            .foregroundStyle(.green)
-                    }
-                }
-                .opacity(isRowProcessing ? 0.0 : 1.0)
-            }
-            .transaction { $0.animation = nil }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
+        Button {
             guard !isDisabled else { return }
             
             if !isServerActive {
@@ -289,8 +242,87 @@ struct QuickApplyView: View {
                 return
             }
 
-            viewModel.handleToggleChange(item: item, enable: !isApplied)
+            if viewModel.isMultiSelectMode {
+                viewModel.toggleSelection(for: item)
+            } else {
+                viewModel.handleToggleChange(item: item, enable: !isApplied)
+            }
+        } label: {
+            HStack(alignment: .center, spacing: 10) {
+                if viewModel.isMultiSelectMode {
+                    Image(systemName: isSelected ? SecretKeys.iconCheckmarkCircle : SecretKeys.iconCircle)
+                        .font(.title3)
+                        .foregroundStyle(isSelected ? AppTheme.accent : Color.secondary.opacity(0.4))
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                        .onTapGesture {
+                            guard !isDisabled && isServerActive else { return }
+                            viewModel.toggleSelection(for: item)
+                        }
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(item.title)
+                            .font(.headline)
+                            .foregroundStyle(Color.primary)
+                    }
+
+                    if let updatedAt = item.updatedAt, !updatedAt.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: SecretKeys.iconClock)
+                                .font(.caption2)
+                            Text("\(SecretKeys.textUpdatePrefix)\(updatedAt.toRelativeTimeText)")
+                                .font(.subheadline)
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .opacity(isServerActive ? 1.0 : 0.35)
+                .grayscale(isServerActive ? 0.0 : 1.0)
+
+                Spacer(minLength: 4)
+
+                ZStack(alignment: .trailing) {
+                    ActivityIndicator(isAnimating: isRowProcessing, style: .medium)
+                        .opacity(isRowProcessing ? 1.0 : 0.0)
+
+                    Group {
+                        if !isServerActive {
+                            if isApplied {
+                                Text(SecretKeys.textRestorePatch)
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(.red)
+                            } else {
+                                Text(SecretKeys.textMaintenance)
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .foregroundStyle(.red)
+                                    .background(Color.clear)
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(Color.red, lineWidth: 1.0)
+                                    )
+                                    .clipShape(Capsule())
+                            }
+                        } else if isApplied {
+                            Text(SecretKeys.textActiveState)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    .opacity(isRowProcessing ? 0.0 : 1.0)
+                }
+                .transaction { $0.animation = nil }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .animation(.easeInOut(duration: 0.22), value: viewModel.isMultiSelectMode)
         }
+        .buttonStyle(NativeListRowButtonStyle(isDisabled: isDisabled || (!isServerActive && !isApplied), isSelected: isSelected))
         .disabled(isDisabled || (!isServerActive && !isApplied))
     }
 
@@ -374,6 +406,6 @@ struct QuickApplyView: View {
         .animation(.easeInOut(duration: 0.22), value: viewModel.selectedItems.isEmpty)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(.systemGroupedBackground))
+        .background(Color(.systemBackground))
     }
 }
