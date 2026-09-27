@@ -31,7 +31,7 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TargetGameView()
+        PatchProjectsView()
             .tint(AppTheme.accent)
             .imageScale(.small)
             .onChange(of: patchDraftCoordinator.request?.id) { requestID in
