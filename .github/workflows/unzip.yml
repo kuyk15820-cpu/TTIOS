@@ -45,13 +45,12 @@ jobs:
       - name: show xcode version
         run: xcodebuild -version
 
-     - name: install ldid & swiftsecretkeys
+      - name: install ldid & swiftsecretkeys
         run: |
           brew install ldid
-          # 🟢 ดาวน์โหลด sskeys binary สำเร็จรูปมาวางตรงๆ เพื่อข้ามปัญหา Swift Tools Version 6.1.0
+          # 🟢 ดาวน์โหลด sskeys binary ตรง ไม่ต้องคอมไพล์เพื่อเลี่ยงปัญหา Swift Tools Version mismatch
           sudo curl -L "https://github.com/MatheusMBispo/SwiftSecretKeys/releases/latest/download/sskeys" -o /usr/local/bin/sskeys
           sudo chmod +x /usr/local/bin/sskeys
-
 
       - name: generate secret keys
         run: sskeys generate
