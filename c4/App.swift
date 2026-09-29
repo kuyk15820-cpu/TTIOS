@@ -7,6 +7,10 @@ struct ThreeOneOSFiveApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var patchDraftCoordinator = PatchDraftCoordinator()
     @StateObject private var fileOperationCoordinator = FileOperationCoordinator()
+    
+    // 🟢 ดึง AppUpdateCheckerManager มาคุม State ระดับ Root App
+    @StateObject private var updateManager = AppUpdateCheckerManager.shared
+    
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
     
     @State private var showOnboarding = false 
@@ -18,9 +22,7 @@ struct ThreeOneOSFiveApp: App {
     private let monitorQueue = DispatchQueue(label: "NetworkMonitorQueue")
 
     init() {
-        // 🟢 เริ่มต้นตั้งค่า SSL Pinning ทันทีตั้งแต่เปิดแอป ก่อนเริ่ม Network หรือ UI ใดๆ
         LayoutMetricsHelper.shared.applyLayoutConstraints()
-        
         setupLogCapture()
         log("app: c4 launching — iOS \(AppInfo.osVersion) (\(AppInfo.osBuild)) \(AppInfo.machineName)")
     }
@@ -40,17 +42,28 @@ struct ThreeOneOSFiveApp: App {
                     .environment(\.appLanguage, language)
                     .environment(\.locale, language.locale)
                     .opacity(isCheckingUpdate ? 0 : 1)
-                    .allowsHitTesting(!showOnboarding && !isCheckingUpdate)
+                    .allowsHitTesting(!showOnboarding && !isCheckingUpdate && !updateManager.isUpdateNeeded)
 
-                // 2. หน้า Splash Screen (แสดงผลค้างไว้จนกว่าจะเช็คเวอร์ชันสำเร็จ)
+                // 2. 🟢 หน้า Force Update (ถ้าต้องอัปเดต จะเด้งทับทันทีไม่ว่าจะอยู่หน้าไหน/เมนูไหน)
+                if updateManager.isUpdateNeeded && !isCheckingUpdate {
+                    AppUpdateView(
+                        downloadUrl: updateManager.downloadUrl,
+                        releaseNotes: updateManager.releaseNotes,
+                        versionString: updateManager.serverVersion
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .zIndex(998)
+                }
+
+                // 3. หน้า Splash Screen (แสดงผลค้างไว้จนกว่าจะเช็คเวอร์ชันสำเร็จ)
                 if isCheckingUpdate {
                     AppSplashScreenView()
                         .transition(.opacity)
                         .zIndex(999)
                 }
 
-                // 3. หน้า Onboarding (แสดงผลหลังจากปิด Splash Screen หากยังตั้งค่าไม่เสร็จ)
-                if showOnboarding && !isCheckingUpdate {
+                // 4. หน้า Onboarding (แสดงผลหลังจากปิด Splash Screen หากยังตั้งค่าไม่เสร็จ)
+                if showOnboarding && !isCheckingUpdate && !updateManager.isUpdateNeeded {
                     OnboardingView {
                         OnboardingStore.markCompleted()
                         withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
@@ -68,8 +81,15 @@ struct ThreeOneOSFiveApp: App {
                 appState.detectSupport()
                 startNetworkMonitoring()
             }
+            // 🟢 ดักจับตอนสลับแอปกลับเข้ามา (Background -> Foreground)
             .onChange(of: scenePhase) { phase in
-                guard phase == .active, !showOnboarding else { return }
+                guard phase == .active else { return }
+                
+                // หากปิด Splash Screen แล้ว ให้แอบเช็คเวอร์ชันใหม่เงียบๆ
+                if !isCheckingUpdate {
+                    updateManager.checkVersion()
+                }
+                
                 appState.detectSupport()
             }
             .onOpenURL { url in
@@ -85,6 +105,9 @@ struct ThreeOneOSFiveApp: App {
                 DispatchQueue.main.async {
                     if self.isCheckingUpdate {
                         self.performUpdateCheck()
+                    } else {
+                        // 🟢 ถ้าเน็ตเชื่อมต่อตอนกำลังใช้งาน ให้แอบเช็คเวอร์ชัน
+                        self.updateManager.checkVersion()
                     }
                 }
             }
@@ -112,7 +135,7 @@ struct ThreeOneOSFiveApp: App {
                 
                 self.networkMonitor.cancel()
                 
-                // ปิด Splash Screen เพื่อสลับเข้าหน้าหลัก (TargetGameView จะสลับรายการแอปตาม isUpdateNeeded เอง)
+                // ปิด Splash Screen เพื่อเปิดหน้าแอป
                 withAnimation(.easeOut(duration: 0.3)) {
                     self.isCheckingUpdate = false
                 }
