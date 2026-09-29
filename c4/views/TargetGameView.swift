@@ -66,7 +66,7 @@ struct TargetGameView: View {
                         }
                     }
                     .navigationTitle(SecretKeys.textHomeNavigationTitle)
-                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarTitleDisplayMode(.large)
                     .toolbar {
                         // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ส่ง showHUD: true เพื่อแสดง HUD ตอนกดรีเฟรชเอง)
                         ToolbarItem(placement: .navigationBarTrailing) {
@@ -82,8 +82,8 @@ struct TargetGameView: View {
                         }
                     }
                     .navigationDestination(for: TargetGameApp.self) { app in
-    PatchProjectsView() 
-}
+                        QuickApplyView(selectedApp: app)
+                    }
                 }
             }
         }
