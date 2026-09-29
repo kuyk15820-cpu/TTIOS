@@ -66,10 +66,10 @@ struct AppUpdateView: View {
                             }
                         }
 
-                        // Headline & Description (ใช้ AnimateText)
+                        // Headline & Description (ใช้ Binding.constant และระบุ type ให้ AnimateText)
                         VStack(alignment: .leading, spacing: 14) {
                             AnimateText(
-                                SecretKeys.updateTitleText,
+                                .constant(SecretKeys.updateTitleText),
                                 type: .letters
                             )
                             .font(.system(size: 30, weight: .bold, design: .default))
@@ -77,7 +77,7 @@ struct AppUpdateView: View {
                             .lineSpacing(4)
 
                             AnimateText(
-                                releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes,
+                                .constant(releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes),
                                 type: .words
                             )
                             .font(.system(size: 15, weight: .regular))
@@ -104,7 +104,7 @@ struct AppUpdateView: View {
                                 ActivityIndicator(isAnimating: true, style: .medium)
                                 
                                 AnimateText(
-                                    updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText,
+                                    .constant(updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText),
                                     type: .words
                                 )
                                 .font(.system(size: 15, weight: .semibold))
@@ -113,14 +113,14 @@ struct AppUpdateView: View {
                                 .minimumScaleFactor(0.8)
                             } else if updateManager.isDone {
                                 AnimateText(
-                                    SecretKeys.updateBtnDone,
+                                    .constant(SecretKeys.updateBtnDone),
                                     type: .letters
                                 )
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
                             } else {
                                 AnimateText(
-                                    SecretKeys.updateBtnNow,
+                                    .constant(SecretKeys.updateBtnNow),
                                     type: .letters
                                 )
                                 .font(.system(size: 17, weight: .semibold))
