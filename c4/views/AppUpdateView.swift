@@ -1,5 +1,4 @@
 import SwiftUI
-import AnimateText
 
 struct AppUpdateView: View {
     // 💡 ดึง Manager เข้ามาคุม State การดาวน์โหลด
@@ -66,24 +65,18 @@ struct AppUpdateView: View {
                             }
                         }
 
-                        // Headline & Description (ใช้ ATOpacityEffect ซึ่งเป็น Concrete Type)
+                        // Headline & Description
                         VStack(alignment: .leading, spacing: 14) {
-                            AnimateText<ATOpacityEffect>(
-                                Binding.constant(SecretKeys.updateTitleText),
-                                type: .letters
-                            )
-                            .font(.system(size: 30, weight: .bold, design: .default))
-                            .foregroundColor(.white)
-                            .lineSpacing(4)
+                            Text(SecretKeys.updateTitleText)
+                                .font(.system(size: 30, weight: .bold, design: .default))
+                                .foregroundColor(.white)
+                                .lineSpacing(4)
 
-                            AnimateText<ATOpacityEffect>(
-                                Binding.constant(releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes),
-                                type: .words
-                            )
-                            .font(.system(size: 15, weight: .regular))
-                            .foregroundColor(Color(white: 0.65))
-                            .lineSpacing(5)
-                            .fixedSize(horizontal: false, vertical: true)
+                            Text(releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes)
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundColor(Color(white: 0.65))
+                                .lineSpacing(5)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(.horizontal, 28)
@@ -103,28 +96,19 @@ struct AppUpdateView: View {
                             if updateManager.isDownloading {
                                 ActivityIndicator(isAnimating: true, style: .medium)
                                 
-                                AnimateText<ATOpacityEffect>(
-                                    Binding.constant(updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText),
-                                    type: .words
-                                )
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                                Text(updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                             } else if updateManager.isDone {
-                                AnimateText<ATOpacityEffect>(
-                                    Binding.constant(SecretKeys.updateBtnDone),
-                                    type: .letters
-                                )
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundColor(.white)
+                                Text(SecretKeys.updateBtnDone)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(.white)
                             } else {
-                                AnimateText<ATOpacityEffect>(
-                                    Binding.constant(SecretKeys.updateBtnNow),
-                                    type: .letters
-                                )
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundColor(.white)
+                                Text(SecretKeys.updateBtnNow)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(.white)
                             }
                         }
                         .frame(maxWidth: .infinity)
