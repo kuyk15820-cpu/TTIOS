@@ -1,4 +1,5 @@
 import SwiftUI
+import AnimateText
 
 struct AppUpdateView: View {
     // 💡 ดึง Manager เข้ามาคุม State การดาวน์โหลด
@@ -65,18 +66,24 @@ struct AppUpdateView: View {
                             }
                         }
 
-                        // Headline & Description
+                        // Headline & Description (ใช้ AnimateText เพิ่มความพริ้วไหว)
                         VStack(alignment: .leading, spacing: 14) {
-                            Text(SecretKeys.updateTitleText)
-                                .font(.system(size: 30, weight: .bold, design: .default))
-                                .foregroundColor(.white)
-                                .lineSpacing(4)
+                            AnimateText(
+                                $updateTitleText,
+                                type: .letters
+                            )
+                            .font(.system(size: 30, weight: .bold, design: .default))
+                            .foregroundColor(.white)
+                            .lineSpacing(4)
 
-                            Text(releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes)
-                                .font(.system(size: 15, weight: .regular))
-                                .foregroundColor(Color(white: 0.65))
-                                .lineSpacing(5)
-                                .fixedSize(horizontal: false, vertical: true)
+                            AnimateText(
+                                $updateNotesText,
+                                type: .words
+                            )
+                            .font(.system(size: 15, weight: .regular))
+                            .foregroundColor(Color(white: 0.65))
+                            .lineSpacing(5)
+                            .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(.horizontal, 28)
@@ -96,19 +103,28 @@ struct AppUpdateView: View {
                             if updateManager.isDownloading {
                                 ActivityIndicator(isAnimating: true, style: .medium)
                                 
-                                Text(updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText)
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
+                                AnimateText(
+                                    $buttonDownloadingText,
+                                    type: .words
+                                )
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                             } else if updateManager.isDone {
-                                Text(SecretKeys.updateBtnDone)
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundColor(.white)
+                                AnimateText(
+                                    $buttonDoneText,
+                                    type: .letters
+                                )
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(.white)
                             } else {
-                                Text(SecretKeys.updateBtnNow)
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundColor(.white)
+                                AnimateText(
+                                    $buttonNowText,
+                                    type: .letters
+                                )
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(.white)
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -126,5 +142,28 @@ struct AppUpdateView: View {
                 .padding(.vertical, 16)
             }
         }
+    }
+
+    // MARK: - Computed Properties for AnimateText Binding
+    private var updateTitleText: Binding<String> {
+        .constant(SecretKeys.updateTitleText)
+    }
+
+    private var updateNotesText: Binding<String> {
+        let text = releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes
+        return .constant(text)
+    }
+
+    private var buttonDownloadingText: Binding<String> {
+        let text = updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText
+        return .constant(text)
+    }
+
+    private var buttonDoneText: Binding<String> {
+        .constant(SecretKeys.updateBtnDone)
+    }
+
+    private var buttonNowText: Binding<String> {
+        .constant(SecretKeys.updateBtnNow)
     }
 }
