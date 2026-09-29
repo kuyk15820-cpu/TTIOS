@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import Network
+import PusherSwift // 🟢 1. Import PusherSwift เพิ่มตรงนี้
 
 @main
 struct ThreeOneOSFiveApp: App {
@@ -20,6 +21,9 @@ struct ThreeOneOSFiveApp: App {
     // ตัว Monitor ดักจับสถานะการเชื่อมต่ออินเทอร์เน็ต
     private let networkMonitor = NWPathMonitor()
     private let monitorQueue = DispatchQueue(label: "NetworkMonitorQueue")
+
+    // 🟢 2. เพิ่มตัวแปรคุม Pusher
+    @State private var pusher: Pusher?
 
     init() {
         LayoutMetricsHelper.shared.applyLayoutConstraints()
@@ -80,6 +84,7 @@ struct ThreeOneOSFiveApp: App {
                 isCheckingUpdate = true
                 appState.detectSupport()
                 startNetworkMonitoring()
+                setupPusher() // 🟢 3. เรียกเริ่มการเชื่อมต่อ Pusher เมื่อแอปเปิด
             }
             // 🟢 ดักจับตอนสลับแอปกลับเข้ามา (Background -> Foreground)
             .onChange(of: scenePhase) { phase in
@@ -96,6 +101,34 @@ struct ThreeOneOSFiveApp: App {
                 patchDraftCoordinator.presentImport(url)
             }
         }
+    }
+
+    // MARK: - Pusher Listener Logic
+    // 🟢 4. เพิ่มฟังก์ชันจัดการและเชื่อมต่อ Pusher
+    private func setupPusher() {
+        let options = PusherClientOptions(
+            host: .cluster("ap1") // 🔴 เปลี่ยนเป็น Cluster ของคุณ เช่น ap1, us2
+        )
+        
+        let pusherClient = Pusher(
+            key: "0df154419e38e8efa9f2", // 🔴 ใส่ Pusher Key ของคุณ
+            options: options
+        )
+        
+        // Subscribe ช่อง Channel เดียวกับที่ฝั่ง Admin (Flutter) ส่งมา
+        let channel = pusherClient.subscribe("app-updates")
+        
+        // Listen Event เมื่อฝั่ง Admin กดสั่งอัปเดตเวอร์ชัน
+        channel.bind(eventName: "version-updated") { _ in
+            DispatchQueue.main.async {
+                log("pusher: received version-updated event, checking version...")
+                // สั่งให้ AppUpdateCheckerManager เช็คเวอร์ชันทันที Real-time
+                self.updateManager.checkVersion()
+            }
+        }
+        
+        pusherClient.connect()
+        self.pusher = pusherClient
     }
 
     // MARK: - Network Monitoring Logic
