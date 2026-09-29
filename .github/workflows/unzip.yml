@@ -50,9 +50,8 @@ jobs:
           brew install ldid
           git clone https://github.com/MatheusMBispo/SwiftSecretKeys.git /tmp/SwiftSecretKeys
           cd /tmp/SwiftSecretKeys
-          # 🟢 แก้ไข swift-tools-version ใน Package.swift ให้รองรับ Swift 6.0 บน Runner
-          sed -i '' 's/swift-tools-version: 6.1.0/swift-tools-version: 6.0/g' Package.swift
-          sed -i '' 's/swift-tools-version:6.1.0/swift-tools-version:6.0/g' Package.swift
+          # 🟢 บังคับเปลี่ยนบรรทัดแรกสุดของ Package.swift ให้เป็น swift-tools-version: 6.0 โดยตรง
+          sed -i '' '1s/.*/\/\/ swift-tools-version: 6.0/' Package.swift
           swift build -c release
           sudo cp .build/release/sskeys /usr/local/bin/
 
