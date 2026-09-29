@@ -103,26 +103,25 @@ struct ThreeOneOSFiveApp: App {
         }
     }
 
-    // MARK: - Pusher Listener Logic
-    // 🟢 4. เพิ่มฟังก์ชันจัดการและเชื่อมต่อ Pusher
+        // MARK: - Pusher Listener Logic
     private func setupPusher() {
         let options = PusherClientOptions(
-            host: .cluster("ap1") // 🔴 เปลี่ยนเป็น Cluster ของคุณ เช่น ap1, us2
+            host: .cluster("ap1") // 🟢 ตรงกับ $pusherCluster = 'ap1'
         )
         
         let pusherClient = Pusher(
-            key: "0df154419e38e8efa9f2", // 🔴 ใส่ Pusher Key ของคุณ
+            key: "0df154419e38e8efa9f2", // 🟢 ตรงกับ $pusherKey
             options: options
         )
         
-        // Subscribe ช่อง Channel เดียวกับที่ฝั่ง Admin (Flutter) ส่งมา
-        let channel = pusherClient.subscribe("app-updates")
+        // 🟢 ตรงกับ $pusher->trigger('patch-channel', ...)
+        let channel = pusherClient.subscribe("patch-channel")
         
-        // Listen Event เมื่อฝั่ง Admin กดสั่งอัปเดตเวอร์ชัน
-        channel.bind(eventName: "version-updated") { _ in
+        // 🟢 ตรงกับ triggerAppVersionEvent('app_version_updated', ...)
+        channel.bind(eventName: "app_version_updated") { _ in
             DispatchQueue.main.async {
-                log("pusher: received version-updated event, checking version...")
-                // สั่งให้ AppUpdateCheckerManager เช็คเวอร์ชันทันที Real-time
+                log("pusher: received app_version_updated event, checking version...")
+                // สั่งให้เช็คเวอร์ชันใหม่ทันทีเมื่อ PHP ยิง Event มา
                 self.updateManager.checkVersion()
             }
         }
