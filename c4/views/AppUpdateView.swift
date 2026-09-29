@@ -66,9 +66,9 @@ struct AppUpdateView: View {
                             }
                         }
 
-                        // Headline & Description (ใช้ Binding.constant และระบุ type ให้ AnimateText)
+                        // Headline & Description
                         VStack(alignment: .leading, spacing: 14) {
-                            AnimateText(
+                            AnimateText<ATTextAnimateEffect>(
                                 .constant(SecretKeys.updateTitleText),
                                 type: .letters
                             )
@@ -76,7 +76,7 @@ struct AppUpdateView: View {
                             .foregroundColor(.white)
                             .lineSpacing(4)
 
-                            AnimateText(
+                            AnimateText<ATTextAnimateEffect>(
                                 .constant(releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes),
                                 type: .words
                             )
@@ -103,7 +103,7 @@ struct AppUpdateView: View {
                             if updateManager.isDownloading {
                                 ActivityIndicator(isAnimating: true, style: .medium)
                                 
-                                AnimateText(
+                                AnimateText<ATTextAnimateEffect>(
                                     .constant(updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText),
                                     type: .words
                                 )
@@ -112,14 +112,14 @@ struct AppUpdateView: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                             } else if updateManager.isDone {
-                                AnimateText(
+                                AnimateText<ATTextAnimateEffect>(
                                     .constant(SecretKeys.updateBtnDone),
                                     type: .letters
                                 )
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
                             } else {
-                                AnimateText(
+                                AnimateText<ATTextAnimateEffect>(
                                     .constant(SecretKeys.updateBtnNow),
                                     type: .letters
                                 )
