@@ -66,10 +66,10 @@ struct AppUpdateView: View {
                             }
                         }
 
-                        // Headline & Description (ใช้ AnimateText เพิ่มความพริ้วไหว)
+                        // Headline & Description (ใช้ AnimateText)
                         VStack(alignment: .leading, spacing: 14) {
                             AnimateText(
-                                $updateTitleText,
+                                SecretKeys.updateTitleText,
                                 type: .letters
                             )
                             .font(.system(size: 30, weight: .bold, design: .default))
@@ -77,7 +77,7 @@ struct AppUpdateView: View {
                             .lineSpacing(4)
 
                             AnimateText(
-                                $updateNotesText,
+                                releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes,
                                 type: .words
                             )
                             .font(.system(size: 15, weight: .regular))
@@ -104,7 +104,7 @@ struct AppUpdateView: View {
                                 ActivityIndicator(isAnimating: true, style: .medium)
                                 
                                 AnimateText(
-                                    $buttonDownloadingText,
+                                    updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText,
                                     type: .words
                                 )
                                 .font(.system(size: 15, weight: .semibold))
@@ -113,14 +113,14 @@ struct AppUpdateView: View {
                                 .minimumScaleFactor(0.8)
                             } else if updateManager.isDone {
                                 AnimateText(
-                                    $buttonDoneText,
+                                    SecretKeys.updateBtnDone,
                                     type: .letters
                                 )
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
                             } else {
                                 AnimateText(
-                                    $buttonNowText,
+                                    SecretKeys.updateBtnNow,
                                     type: .letters
                                 )
                                 .font(.system(size: 17, weight: .semibold))
@@ -142,28 +142,5 @@ struct AppUpdateView: View {
                 .padding(.vertical, 16)
             }
         }
-    }
-
-    // MARK: - Computed Properties for AnimateText Binding
-    private var updateTitleText: Binding<String> {
-        .constant(SecretKeys.updateTitleText)
-    }
-
-    private var updateNotesText: Binding<String> {
-        let text = releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes
-        return .constant(text)
-    }
-
-    private var buttonDownloadingText: Binding<String> {
-        let text = updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText
-        return .constant(text)
-    }
-
-    private var buttonDoneText: Binding<String> {
-        .constant(SecretKeys.updateBtnDone)
-    }
-
-    private var buttonNowText: Binding<String> {
-        .constant(SecretKeys.updateBtnNow)
     }
 }
