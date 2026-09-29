@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-26
+    runs-on: macos-14
 
     steps:
       - name: checkout
@@ -56,7 +56,7 @@ jobs:
       - name: generate secret keys
         run: sskeys generate
 
-      # 🟢 ขั้นตอนเพิ่มใหม่: เปลี่ยนชื่อแอป, Bundle ID และ Version
+      # 🟢 ขั้นตอนอัปเดตชื่อแอป, Bundle ID และ Version
       - name: update app metadata (name, bundle id, version)
         env:
           APP_NAME: ${{ github.event.inputs.app_name || 'c4' }}
@@ -313,7 +313,24 @@ jobs:
             puts 'Added Swift Package: AnimateText'
           end
 
-          # 🟢 9. Sync ไฟล์ .swift, .m, .mm, .cpp และ .h เข้า Compile Sources และ Project
+          # 🟢 13. สั่งเพิ่ม Swift Package (PusherSwift -> Product Name: PusherSwift)
+          pusher_url = 'https://github.com/pusher/pusher-websocket-swift.git'
+          pusher_ref = project.root_object.package_references.find { |p| p.repositoryURL == pusher_url }
+          unless pusher_ref
+            pusher_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            pusher_ref.repositoryURL = pusher_url
+            pusher_ref.requirement = { 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '10.1.0' }
+            project.root_object.package_references << pusher_ref
+            
+            pusher_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            pusher_product_dependency.product_name = 'PusherSwift'
+            pusher_product_dependency.package = pusher_ref
+            
+            target.package_product_dependencies << pusher_product_dependency
+            puts 'Added Swift Package: PusherSwift'
+          end
+
+          # 🟢 Sync ไฟล์ .swift, .m, .mm, .cpp และ .h เข้า Compile Sources และ Project
           source_phase = target.source_build_phase
           existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
 
@@ -383,7 +400,6 @@ jobs:
         with:
           name: release-ipa
           path: build/*.ipa
-
 
   release:
     if: github.event_name != 'pull_request'
