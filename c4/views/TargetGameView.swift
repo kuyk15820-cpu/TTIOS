@@ -15,80 +15,67 @@ struct TargetGameView: View {
     private let targetGamesURL = URL(string: SecretKeys.targetGamesURL)
 
     var body: some View {
-        Group {
-            if updateManager.isUpdateNeeded {
-                // 🟢 ถ้ามีอัปเดต ให้แสดงหน้า AppUpdateView ดีไซน์เต็มหน้า
-                AppUpdateView(
-                    downloadUrl: updateManager.downloadUrl,
-                    releaseNotes: updateManager.releaseNotes,
-                    versionString: updateManager.serverVersion
-                )
-            } else {
-                // 🔵 ถ้าไม่มีอัปเดต แสดงรายการเลือกเกมปกติ
-                NavigationStack {
-                    Group {
-                        if isLoading {
-                            // ขณะกำลังโหลดข้อมูล -> ซ่อน List ทั้งหมด
-                            Color.clear
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else if targetApps.isEmpty {
-                            // 🟢 เรียกใช้ EmptyStateView แบบระบุ type: .noGames
-                            EmptyStateView(type: .noGames)
-                        } else {
-                            // มีรายการเกม -> แสดง List
-                            List {
-                                Section {
-                                    ForEach(targetApps) { app in
-                                        NavigationLink(value: app) {
-                                            HStack(spacing: 12) {
-                                                if let icon = app.icon {
-                                                    Image(uiImage: icon)
-                                                        .resizable()
-                                                        .frame(width: 32, height: 32)
-                                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                                } else {
-                                                    Image(systemName: SecretKeys.iconAppWindowCheckmark)
-                                                        .font(.title2)
-                                                        .foregroundStyle(Color.primary)
-                                                }
-
-                                                Text(app.name)
-                                                    .font(.headline)
-                                            }
-                                            .contentShape(Rectangle())
+        NavigationStack {
+            Group {
+                if isLoading {
+                    // ขณะกำลังโหลดข้อมูล -> ซ่อน List ทั้งหมด
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if targetApps.isEmpty {
+                    // 🟢 เรียกใช้ EmptyStateView แบบระบุ type: .noGames
+                    EmptyStateView(type: .noGames)
+                } else {
+                    // มีรายการเกม -> แสดง List
+                    List {
+                        Section {
+                            ForEach(targetApps) { app in
+                                NavigationLink(value: app) {
+                                    HStack(spacing: 12) {
+                                        if let icon = app.icon {
+                                            Image(uiImage: icon)
+                                                .resizable()
+                                                .frame(width: 32, height: 32)
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        } else {
+                                            Image(systemName: SecretKeys.iconAppWindowCheckmark)
+                                                .font(.title2)
+                                                .foregroundStyle(Color.primary)
                                         }
+
+                                        Text(app.name)
+                                            .font(.headline)
                                     }
-                                } header: {
-                                    Text(SecretKeys.textSelectGameSection)
+                                    .contentShape(Rectangle())
                                 }
                             }
-                            .listStyle(.plain)
+                        } header: {
+                            Text(SecretKeys.textSelectGameSection)
                         }
                     }
-                    .navigationTitle(SecretKeys.textHomeNavigationTitle)
-                    .navigationBarTitleDisplayMode(.large)
-                    .toolbar {
-                        // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ส่ง showHUD: true เพื่อแสดง HUD ตอนกดรีเฟรชเอง)
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button {
-                                Task {
-                                    await fetchTargetGames(showHUD: true)
-                                }
-                            } label: {
-                                Image(systemName: SecretKeys.iconRefresh)
-                            }
-                            .disabled(isLoading)
-                            .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
-                        }
-                    }
-                    .navigationDestination(for: TargetGameApp.self) { app in
-                        QuickApplyView(selectedApp: app)
-                    }
+                    .listStyle(.plain)
                 }
+            }
+            .navigationTitle(SecretKeys.textHomeNavigationTitle)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ส่ง showHUD: true เพื่อแสดง HUD ตอนกดรีเฟรชเอง)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        Task {
+                            await fetchTargetGames(showHUD: true)
+                        }
+                    } label: {
+                        Image(systemName: SecretKeys.iconRefresh)
+                    }
+                    .disabled(isLoading)
+                    .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
+                }
+            }
+            .navigationDestination(for: TargetGameApp.self) { app in
+                QuickApplyView(selectedApp: app)
             }
         }
         .onAppear {
-            updateManager.checkVersion()
             Task {
                 // 🟢 โหลดข้อมูลเมื่อเปิดหน้าจอขึ้นมา (showHUD เป็น false โดยดีฟอลต์)
                 await fetchTargetGames()
@@ -134,6 +121,9 @@ struct TargetGameView: View {
     private func fetchTargetGames(showHUD: Bool = false) async {
         guard let url = targetGamesURL else { return }
         
+        // 🟢 พ่วงแอบตรวจเช็คเวอร์ชันระบบไปด้วยทุกครั้งที่มีการดึงข้อมูลรายการเกม
+        updateManager.checkVersion()
+
         await MainActor.run {
             self.isLoading = true
             if showHUD {
