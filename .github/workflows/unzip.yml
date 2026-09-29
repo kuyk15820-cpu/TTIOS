@@ -296,6 +296,23 @@ jobs:
             puts 'Added Swift Package: SkeletonView'
           end
 
+          # 🟢 12. สั่งเพิ่ม Swift Package (AnimateText)
+          animatetext_url = 'https://github.com/jasudev/AnimateText.git'
+          animatetext_ref = project.root_object.package_references.find { |p| p.repositoryURL == animatetext_url }
+          unless animatetext_ref
+            animatetext_ref = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+            animatetext_ref.repositoryURL = animatetext_url
+            animatetext_ref.requirement = { 'kind' => 'branch', 'branch' => 'main' }
+            project.root_object.package_references << animatetext_ref
+            
+            animatetext_product_dependency = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+            animatetext_product_dependency.product_name = 'AnimateText'
+            animatetext_product_dependency.package = animatetext_ref
+            
+            target.package_product_dependencies << animatetext_product_dependency
+            puts 'Added Swift Package: AnimateText'
+          end
+
           # 🟢 9. Sync ไฟล์ .swift, .m, .mm, .cpp และ .h เข้า Compile Sources และ Project
           source_phase = target.source_build_phase
           existing_files = source_phase.files_references.compact.map(&:real_path).compact.map(&:to_s)
