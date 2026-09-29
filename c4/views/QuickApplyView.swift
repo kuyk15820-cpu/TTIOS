@@ -70,6 +70,9 @@ struct QuickApplyView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
 
+    // 🟢 ตรวจจับ สถานะการทำงานของแอป (Active, Inactive, Background)
+    @Environment(\.scenePhase) private var scenePhase
+
     // 🟢 ตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
     @State private var networkMonitor: NWPathMonitor?
 
@@ -187,6 +190,17 @@ struct QuickApplyView: View {
         .onDisappear {
             // 🟢 ยกเลิกการดักจับเมื่อออกจากหน้าจอ
             stopNetworkMonitoring()
+        }
+        // 🟢 ตรวจจับเมื่อมีการสลับแอปกลับเข้ามาหน้าจอ (.active)
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                Task {
+                    // หากไม่ได้กำลังประมวลผล patch อยู่ ให้ดึงข้อมูล Patch Catalog ล่าสุดเบื้องหลัง (ไม่แสดง HUD รบกวน)
+                    if viewModel.processingItemID == nil && !viewModel.isRestoringAll && !viewModel.isProcessingBatch {
+                        await viewModel.fetchCatalog(force: true, showHUD: false)
+                    }
+                }
+            }
         }
     }
 
