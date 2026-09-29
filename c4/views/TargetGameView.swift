@@ -4,6 +4,9 @@ import Network
 struct TargetGameView: View {
     @StateObject private var updateManager = AppUpdateCheckerManager.shared
 
+    // 🟢 ตรวจจับ สถานะการทำงานของแอป (Active, Inactive, Background)
+    @Environment(\.scenePhase) private var scenePhase
+
     // เริ่มต้นเป็น Array ว่าง (ดึงข้อมูล Dynamic จาก Server)
     @State private var targetApps: [TargetGameApp] = []
     @State private var isLoading = false
@@ -86,6 +89,14 @@ struct TargetGameView: View {
         .onDisappear {
             // 🟢 ปิด Monitor เมื่อออกจากหน้า เพื่อคืนทรัพยากร
             stopNetworkMonitoring()
+        }
+        // 🟢 ตรวจจับเมื่อสลับแอปกลับเข้ามาหน้าจอหลัก (.active) แล้วโหลดข้อมูลใหม่เงียบๆ
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                Task {
+                    await fetchTargetGames(showHUD: false)
+                }
+            }
         }
     }
 
