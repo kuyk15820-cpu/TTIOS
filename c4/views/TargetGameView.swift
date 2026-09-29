@@ -98,6 +98,12 @@ struct TargetGameView: View {
                 }
             }
         }
+        // 🟢 รับสัญญาณจาก Pusher (เมื่อ PHP ยิง Event 'game_updated' มา) เพื่อรีเฟรชรายชื่อเกมทันที
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshTargetGames"))) { _ in
+            Task {
+                await fetchTargetGames(showHUD: false)
+            }
+        }
     }
 
     // MARK: - Network Monitoring Logic
