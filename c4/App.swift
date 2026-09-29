@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 import Network
-import PusherSwift // 🟢 1. Import PusherSwift เพิ่มตรงนี้
+import PusherSwift // 🟢 1. Import PusherSwift
 
 @main
 struct ThreeOneOSFiveApp: App {
@@ -103,7 +103,7 @@ struct ThreeOneOSFiveApp: App {
         }
     }
 
-        // MARK: - Pusher Listener Logic
+    // MARK: - Pusher Listener Logic
     private func setupPusher() {
         let options = PusherClientOptions(
             host: .cluster("ap1") // 🟢 ตรงกับ $pusherCluster = 'ap1'
@@ -114,15 +114,27 @@ struct ThreeOneOSFiveApp: App {
             options: options
         )
         
-        // 🟢 ตรงกับ $pusher->trigger('patch-channel', ...)
+        // 🟢 Subscribe ไปที่ channel 'patch-channel'
         let channel = pusherClient.subscribe("patch-channel")
         
-        // 🟢 ตรงกับ triggerAppVersionEvent('app_version_updated', ...)
+        // 🟢 1. ดัก Event อัปเดตแอปเวอร์ชัน (app_version_updated)
         channel.bind(eventName: "app_version_updated") { _ in
             DispatchQueue.main.async {
                 log("pusher: received app_version_updated event, checking version...")
-                // สั่งให้เช็คเวอร์ชันใหม่ทันทีเมื่อ PHP ยิง Event มา
                 self.updateManager.checkVersion()
+            }
+        }
+        
+        // 🟢 2. ดัก Event อัปเดตเกม (game_updated / game_version_updated)
+        channel.bind(eventName: "game_updated") { data in
+            DispatchQueue.main.async {
+                log("pusher: received game_updated event -> \(String(describing: data))")
+                
+                // 1. เรียกเช็คเวอร์ชันแอปเพิ่มเติมเพื่อความชัวร์ (ถ้าจำเป็น)
+                self.updateManager.checkVersion()
+                
+                // 2. แจ้งเตือน Notification บอกจุดอื่นให้รีโหลดข้อมูล patch / game Data
+                NotificationCenter.default.post(name: Notification.Name("GameUpdateReceived"), object: data)
             }
         }
         
