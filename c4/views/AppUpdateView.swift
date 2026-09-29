@@ -66,18 +66,18 @@ struct AppUpdateView: View {
                             }
                         }
 
-                        // Headline & Description
+                        // Headline & Description (ใช้ ATOpacityEffect ซึ่งเป็น Concrete Type)
                         VStack(alignment: .leading, spacing: 14) {
-                            AnimateText<ATTextAnimateEffect>(
-                                .constant(SecretKeys.updateTitleText),
+                            AnimateText<ATOpacityEffect>(
+                                Binding.constant(SecretKeys.updateTitleText),
                                 type: .letters
                             )
                             .font(.system(size: 30, weight: .bold, design: .default))
                             .foregroundColor(.white)
                             .lineSpacing(4)
 
-                            AnimateText<ATTextAnimateEffect>(
-                                .constant(releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes),
+                            AnimateText<ATOpacityEffect>(
+                                Binding.constant(releaseNotes?.isEmpty == false ? releaseNotes! : SecretKeys.updateDefaultNotes),
                                 type: .words
                             )
                             .font(.system(size: 15, weight: .regular))
@@ -103,8 +103,8 @@ struct AppUpdateView: View {
                             if updateManager.isDownloading {
                                 ActivityIndicator(isAnimating: true, style: .medium)
                                 
-                                AnimateText<ATTextAnimateEffect>(
-                                    .constant(updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText),
+                                AnimateText<ATOpacityEffect>(
+                                    Binding.constant(updateManager.downloadSizeText.isEmpty ? SecretKeys.updateBtnDownloadingDefault : updateManager.downloadSizeText),
                                     type: .words
                                 )
                                 .font(.system(size: 15, weight: .semibold))
@@ -112,15 +112,15 @@ struct AppUpdateView: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                             } else if updateManager.isDone {
-                                AnimateText<ATTextAnimateEffect>(
-                                    .constant(SecretKeys.updateBtnDone),
+                                AnimateText<ATOpacityEffect>(
+                                    Binding.constant(SecretKeys.updateBtnDone),
                                     type: .letters
                                 )
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
                             } else {
-                                AnimateText<ATTextAnimateEffect>(
-                                    .constant(SecretKeys.updateBtnNow),
+                                AnimateText<ATOpacityEffect>(
+                                    Binding.constant(SecretKeys.updateBtnNow),
                                     type: .letters
                                 )
                                 .font(.system(size: 17, weight: .semibold))
