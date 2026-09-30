@@ -166,15 +166,10 @@ struct ThreeOneOSFiveApp: App {
     private func performUpdateCheck() {
         let startTime = Date()
         
-        // 🟢 1. Pre-fetch โหลดรายการเกม และรายการ Patch ล่วงหน้าเบื้องหลัง (ไม่แสดง HUD)
+        // 🟢 1. Pre-fetch โหลดรายการเกม และรายการ Patch Catalog ล่วงหน้าเบื้องหลังผ่าน Singleton โดยตรง (ไม่แสดง HUD)
         Task {
             await TargetGameManager.shared.fetchTargetGames(showHUD: false)
-            
-            // ดึงรายการ Patch ของเกมแรกเตรียมไว้ใน Memory ล่วงหน้า (ถ้ามีเกมในระบบ)
-            if let firstGame = TargetGameManager.shared.targetApps.first {
-                let tempVM = QuickApplyViewModel(selectedApp: firstGame)
-                await tempVM.fetchCatalog(force: true, showHUD: false)
-            }
+            await QuickApplyManager.shared.fetchCatalog(force: true, showHUD: false)
         }
         
         // 🟢 2. เช็คเวอร์ชันแอปควบคู่กันไป
