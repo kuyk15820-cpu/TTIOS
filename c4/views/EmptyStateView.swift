@@ -1,22 +1,20 @@
 import SwiftUI
-import Lottie
 
 struct EmptyStateView: View {
     // 🟢 Enum สำหรับแบ่งประเภทการแสดงผลตามสถานะต่างๆ
     enum EmptyType {
-        case noGames                                    // ไม่พบรายการเกม
-        case noPatches                                  // ไม่พบรายการ Patch
-        case custom(animationName: String, title: String) // กำหนดชื่อไฟล์ Lottie (.json) และ Title เอง
+        case noGames                               // ไม่พบรายการเกม
+        case noPatches                             // ไม่พบรายการ Patch
+        case custom(icon: String, title: String)   // กำหนด Icon และ Title เอง
 
-        /// คืนค่าชื่อไฟล์ Lottie (.json) ใน Bundle
-        var animationName: String {
+        var iconName: String {
             switch self {
             case .noGames:
-                return SecretKeys.iconNoGame       // ชื่อไฟล์ .json สำหรับหน้า No Games (เช่น "no_games_anim")
+                return SecretKeys.iconNoGame
             case .noPatches:
-                return SecretKeys.iconEmptyState   // ชื่อไฟล์ .json สำหรับหน้า No Patches (เช่น "empty_state_anim")
-            case .custom(let animationName, _):
-                return animationName
+                return SecretKeys.iconEmptyState
+            case .custom(let icon, _):
+                return icon
             }
         }
 
@@ -36,13 +34,9 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            // 🟢 เล่นไฟล์ Lottie .json แบบ วนซ้ำ (Loop)
-            LottieView(animation: .named(type.animationName))
-                .playing(loopMode: .loop)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 150, height: 150) // กำหนดขนาดของแอนิเมชันตามต้องการ
-
+            Image(systemName: type.iconName)
+                .font(.system(size: 40))
+                .foregroundColor(.secondary)
             Text(type.title)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
