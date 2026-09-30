@@ -86,7 +86,10 @@ class TargetGameManager: ObservableObject {
             let remainingTime = max(0, minDuration - elapsedTime)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + remainingTime) {
-                self.targetApps = fetchedApps
+                // 🟢 ใส่ Animation ลื่นๆ เมื่อรายการเกมมีการอัปเดต/เปลี่ยนแปลง
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.targetApps = fetchedApps
+                }
                 self.isLoading = false
                 if showHUD {
                     HUDHelper.hide()
