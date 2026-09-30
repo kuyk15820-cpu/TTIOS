@@ -15,8 +15,14 @@ struct TargetGameView: View {
         NavigationStack {
             Group {
                 if gameManager.targetApps.isEmpty {
-                    // 🟢 โชว์ Empty State เฉพาะกรณีที่ไม่มีรายการเกมจริงๆ
-                    EmptyStateView(type: .noGames)
+                    if gameManager.isLoading {
+                        // 🟢 กำลังโหลดครั้งแรกและยังไม่มีข้อมูล -> แสดงพื้นที่ว่างเปล่า (กันหน้า Empty State กระพริบ)
+                        Color.clear
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        // 🟢 โหลดเสร็จแล้วแต่ไม่มีรายการเกมจริงๆ -> แสดง Empty State
+                        EmptyStateView(type: .noGames)
+                    }
                 } else {
                     // 🟢 แสดง List เสมอ (ไม่ซ่อน List แม้กำลังเช็คข้อมูลเบื้องหลัง)
                     List {
@@ -67,7 +73,8 @@ struct TargetGameView: View {
             }
         }
         .onAppear {
-            gameManager.fetchTargetGames()
+            // 🟢 โหลดข้อมูลเบื้องหลังโดยไม่ขึ้น HUD (เนื่องจาก Pre-fetch มาแล้วจาก Splash Screen)
+            gameManager.fetchTargetGames(showHUD: false)
             startNetworkMonitoring()
         }
         .onDisappear {
