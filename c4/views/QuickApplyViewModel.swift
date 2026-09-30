@@ -1,47 +1,71 @@
 import Foundation
 import UIKit
 import SwiftUI
+import Combine
 
 @MainActor
 class QuickApplyViewModel: ObservableObject {
     let selectedApp: TargetGameApp
 
-    @Published var patchItems: [QuickPatchItem] = []
+    // 🟢 ผูกข้อมูลกับ Singleton Manager เพื่อให้ข้อมูลคงอยู่ใน Memory ตลอดเวลา
+    @ObservedObject var manager = QuickApplyManager.shared
+
     @Published var activePatches: [String: Bool] = [:]
     @Published var selectedItems: Set<String> = []
     @Published var selectedCategory: String = SecretKeys.categoryAll
     @Published var isMultiSelectMode = false
 
-    @Published var isLoadingCatalog = false
     @Published var processingItemID: String?
     @Published var isProcessingBatch = false
     @Published var isRestoringAll = false
 
-    private var catalogURL: URL {
-        return URL(string: SecretKeys.catalogURL)!
+    private var cancellables = Set<AnyCancellable>()
+
+    // 🟢 ดึงข้อมูล patchItems โดยตรงจาก Manager
+    var patchItems: [QuickPatchItem] {
+        manager.patchItems
+    }
+
+    // 🟢 ดึงสถานะ isLoadingCatalog โดยตรงจาก Manager
+    var isLoadingCatalog: Bool {
+        manager.isLoadingCatalog
     }
 
     init(selectedApp: TargetGameApp) {
         self.selectedApp = selectedApp
         
-        // 🟢 ดักรับสัญญาณ Real-time จาก Pusher (event: patch_updated -> RefreshCatalogPatches)
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleCatalogUpdateNotification),
-            name: NSNotification.Name("RefreshCatalogPatches"),
-            object: nil
-        )
+        // 🟢 อัปเดตสถานะ Active ของ Patch ทันทีที่มีการสร้าง ViewModel
+        self.updateActiveStatus(for: manager.patchItems)
+
+        // 🟢 คอยสังเกตการเปลี่ยนแปลง patchItems จาก Manager เพื่ออัปเดต activePatches
+        manager.$patchItems
+            .sink { [weak self] newItems in
+                guard let self = self else { return }
+                self.updateActiveStatus(for: newItems)
+                self.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
-    }
+    // MARK: - Helper Update Status
+    private func updateActiveStatus(for items: [QuickPatchItem]) {
+        for item in items {
+            if let localURL = self.localPatchURL(for: item.id),
+               FileManager.default.fileExists(atPath: localURL.path),
+               let packageData = try? Data(contentsOf: localURL),
+               let decoded = try? PatchPackageCodec.decode(packageData, password: nil) {
 
-    @objc private func handleCatalogUpdateNotification() {
-        Task { @MainActor in
-            // 🟢 ดึงข้อมูล Catalog ใหม่ทันทีแบบ Background Refresh (ไม่แสดง HUD)
-            await self.fetchCatalog(force: true, showHUD: false)
+                let hasReceipt = DevicePatchService.latestReceipt(projectID: decoded.project.id) != nil
+                self.activePatches[item.id] = hasReceipt
+            } else {
+                self.activePatches[item.id] = false
+            }
         }
+    }
+
+    // MARK: - Fetch Catalog Bridge
+    func fetchCatalog(force: Bool = false, showHUD: Bool = true) async {
+        await manager.fetchCatalog(force: force, showHUD: showHUD)
     }
 
     // MARK: - Computed Properties
@@ -189,81 +213,6 @@ class QuickApplyViewModel: ObservableObject {
             try fileManager.removeItem(at: destinationURL)
         }
         try fileManager.moveItem(at: tempURL, to: destinationURL)
-    }
-
-    func fetchCatalog(force: Bool = false, showHUD: Bool = true) async {
-        if !patchItems.isEmpty && !force { return }
-
-        isLoadingCatalog = true 
-        
-        // 🟢 ควบคุมการแสดง HUD ตามค่า showHUD
-        if showHUD {
-            HUDHelper.show(message: "")
-        }
-        
-        let startTime = Date()
-
-        do {
-            var request = URLRequest(
-                url: catalogURL,
-                cachePolicy: .reloadIgnoringLocalCacheData,
-                timeoutInterval: 15
-            )
-            request.httpMethod = "GET"
-            request.setValue(SecretKeys.userAgentValue, forHTTPHeaderField: SecretKeys.userAgentHeader)
-
-            // 🟢 ใช้ URLSession.pinned ที่ผูก SSL Pinning Delegate ไว้แล้ว
-            let (data, response) = try await URLSession.pinned.data(for: request)
-            
-            if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
-                let items = try JSONDecoder().decode([QuickPatchItem].self, from: data)
-
-                // 🟢 ใช้ withAnimation เพื่อให้หน้า UI เปลี่ยนรายการ Patch อย่างนุ่มนวล
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    self.patchItems = items
-                }
-
-                for item in items {
-                    if let localURL = self.localPatchURL(for: item.id),
-                       FileManager.default.fileExists(atPath: localURL.path),
-                       let packageData = try? Data(contentsOf: localURL),
-                       let decoded = try? PatchPackageCodec.decode(packageData, password: nil) {
-
-                        let hasReceipt = DevicePatchService.latestReceipt(projectID: decoded.project.id) != nil
-                        self.activePatches[item.id] = hasReceipt
-                    } else {
-                        self.activePatches[item.id] = false
-                    }
-                }
-            } else {
-                // 🔴 HTTP Code ไม่ผ่าน ให้ล้างรายการทิ้ง
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    self.patchItems = []
-                }
-            }
-        } catch {
-            print("Fetch catalog failed: \(error)")
-            // 🔴 ดึงข้อมูลล้มเหลว (เช่น ไม่พบเครือข่าย) ล้างข้อมูลออกเพื่อให้ View สลับไปหน้า Empty State
-            withAnimation(.easeInOut(duration: 0.3)) {
-                self.patchItems = []
-            }
-        }
-
-        let elapsedTime = Date().timeIntervalSince(startTime)
-        let minDuration: TimeInterval = showHUD ? 1.0 : 0.0
-        let remainingTime = max(0, minDuration - elapsedTime)
-        
-        if remainingTime > 0 {
-            let remainingNano = UInt64(remainingTime * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: remainingNano)
-        }
-
-        self.isLoadingCatalog = false
-        
-        // 🟢 ซ่อน HUD เมื่อเปิดไว้
-        if showHUD {
-            HUDHelper.hide()
-        }
     }
 
     private nonisolated func translatePatchError(_ error: PatchPackageError) -> String {
