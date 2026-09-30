@@ -82,8 +82,8 @@ struct QuickApplyView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Category Tab Bar
-            if !viewModel.isLoadingCatalog && viewModel.availableCategories.count > 1 {
+            // Category Tab Bar (แสดงเมื่อมีรายการ Patch และมีหมวดหมู่มากกว่า 1)
+            if !viewModel.patchItems.isEmpty && viewModel.availableCategories.count > 1 {
                 CategoryTabBar(
                     categories: viewModel.availableCategories,
                     selectedCategory: $viewModel.selectedCategory,
@@ -91,24 +91,26 @@ struct QuickApplyView: View {
                 )
             }
 
-            // Main Content Area
-            if viewModel.isLoadingCatalog {
-                // ขณะรีเฟรชหรือโหลดข้อมูล -> ซ่อน List ทั้งหมด
-                Color.clear
+            // MARK: - Main Content Area
+            if viewModel.patchItems.isEmpty {
+                if viewModel.isLoadingCatalog {
+                    // 🟢 โหลดครั้งแรก และยังไม่มีข้อมูลในมือ -> แสดงพื้นที่ว่างเปล่า
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // 🟢 โหลดเสร็จแล้วแต่ไม่มีข้อมูล -> แสดง Empty State
+                    VStack(spacing: 12) {
+                        Image(systemName: SecretKeys.iconEmptyState)
+                            .font(.system(size: 40))
+                            .foregroundColor(.secondary)
+                        Text(SecretKeys.textNoPatchesFound)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if viewModel.displayedPatches.isEmpty {
-                // โหลดเสร็จแล้วแต่ไม่มีข้อมูล -> แสดง Empty State
-                VStack(spacing: 12) {
-                    Image(systemName: SecretKeys.iconEmptyState)
-                        .font(.system(size: 40))
-                        .foregroundColor(.secondary)
-                    Text(SecretKeys.textNoPatchesFound)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // โหลดเสร็จและมีข้อมูล -> แสดง List
+                // 🟢 มีข้อมูลอยู่แล้ว -> แสดง List ค้างไว้ตลอดเวลา ไม่ซ่อนแม้จะกำลังอัปเดตข้อมูลเบื้องหลัง
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         // Section Header สไตล์ Native List
@@ -157,7 +159,7 @@ struct QuickApplyView: View {
             }
             
             // Bottom Controls
-            if !viewModel.filteredGamePatches.isEmpty && !viewModel.isLoadingCatalog {
+            if !viewModel.filteredGamePatches.isEmpty {
                 bottomActionButtons
             }
         }
