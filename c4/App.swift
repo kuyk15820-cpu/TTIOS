@@ -134,7 +134,7 @@ struct ThreeOneOSFiveApp: App {
                 self.updateManager.checkVersion()
                 
                 // 2. แจ้งเตือน Notification บอกจุดอื่นให้รีโหลดข้อมูล patch / game Data
-                NotificationCenter.default.post(name: Notification.Name("GameUpdateReceived"), object: data)
+                NotificationCenter.default.post(name: Notification.Name("RefreshTargetGames"), object: data)
             }
         }
         
