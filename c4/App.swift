@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 import Network
-import PusherSwift // 🟢 1. Import PusherSwift
+import PusherSwift // 🟢 Import PusherSwift
 
 @main
 struct ThreeOneOSFiveApp: App {
@@ -22,7 +22,7 @@ struct ThreeOneOSFiveApp: App {
     private let networkMonitor = NWPathMonitor()
     private let monitorQueue = DispatchQueue(label: "NetworkMonitorQueue")
 
-    // 🟢 2. เพิ่มตัวแปรคุม Pusher
+    // 🟢 ตัวแปรคุม Pusher
     @State private var pusher: Pusher?
 
     init() {
@@ -84,7 +84,7 @@ struct ThreeOneOSFiveApp: App {
                 isCheckingUpdate = true
                 appState.detectSupport()
                 startNetworkMonitoring()
-                setupPusher() // 🟢 3. เรียกเริ่มการเชื่อมต่อ Pusher เมื่อแอปเปิด
+                setupPusher() // 🟢 เรียกเริ่มการเชื่อมต่อ Pusher เมื่อแอปเปิด
             }
             // 🟢 ดักจับตอนสลับแอปกลับเข้ามา (Background -> Foreground)
             .onChange(of: scenePhase) { phase in
@@ -125,16 +125,19 @@ struct ThreeOneOSFiveApp: App {
             }
         }
         
-        // 🟢 2. ดัก Event อัปเดตเกม (game_updated / game_version_updated)
+        // 🟢 2. ดัก Event อัปเดตเกม -> แจ้งเตือนฝั่ง Target Games
         channel.bind(eventName: "game_updated") { data in
             DispatchQueue.main.async {
                 log("pusher: received game_updated event -> \(String(describing: data))")
-                
-                // 1. เรียกเช็คเวอร์ชันแอปเพิ่มเติมเพื่อความชัวร์ (ถ้าจำเป็น)
-                self.updateManager.checkVersion()
-                
-                // 2. แจ้งเตือน Notification บอกจุดอื่นให้รีโหลดข้อมูล patch / game Data
                 NotificationCenter.default.post(name: Notification.Name("RefreshTargetGames"), object: data)
+            }
+        }
+        
+        // 🟢 3. ดัก Event อัปเดตแพตช์ -> แจ้งเตือนฝั่ง Patch Catalog (QuickApply)
+        channel.bind(eventName: "patch_updated") { data in
+            DispatchQueue.main.async {
+                log("pusher: received patch_updated event -> \(String(describing: data))")
+                NotificationCenter.default.post(name: Notification.Name("RefreshCatalogPatches"), object: data)
             }
         }
         
