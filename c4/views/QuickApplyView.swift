@@ -94,7 +94,7 @@ struct QuickApplyView: View {
             // MARK: - Main Content Area
             if viewModel.patchItems.isEmpty {
                 if viewModel.isLoadingCatalog {
-                    // 🟢 โหลดครั้งแรก และยังไม่มีข้อมูลในมือ -> แสดงพื้นที่ว่างเปล่า
+                    // 🟢 โหลดครั้งแรกเบื้องหลัง และยังไม่มีข้อมูลในมือ -> แสดงพื้นที่ว่างเปล่า (กันกระพริบ)
                     Color.clear
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -110,7 +110,7 @@ struct QuickApplyView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
-                // 🟢 มีข้อมูลอยู่แล้ว -> แสดง List ค้างไว้ตลอดเวลา ไม่ซ่อนแม้จะกำลังอัปเดตข้อมูลเบื้องหลัง
+                // 🟢 มีข้อมูลอยู่แล้ว -> แสดง List ค้างไว้ตลอดเวลา
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         // Section Header สไตล์ Native List
@@ -166,38 +166,20 @@ struct QuickApplyView: View {
         .navigationTitle(viewModel.selectedApp.name)
         .navigationBarTitleDisplayMode(.large)
         .tint(AppTheme.accent)
-        .toolbar {
-            // Toolbar ปุ่ม Refresh
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    Task {
-                        // 🟢 ส่ง force: true และ showHUD: true เมื่อผู้ใช้กดรีเฟรชเอง
-                        await viewModel.fetchCatalog(force: true, showHUD: true)
-                    }
-                } label: {
-                    Image(systemName: SecretKeys.iconRefresh)
-                }
-                .disabled(viewModel.isLoadingCatalog || viewModel.processingItemID != nil || viewModel.isRestoringAll || viewModel.isProcessingBatch)
-                .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
-            }
-        }
         .task {
-            // 🟢 โหลดข้อมูลครั้งแรกตามปกติ (แสดง HUD)
-            await viewModel.fetchCatalog(showHUD: true)
+            // 🟢 ดึงข้อมูลล่าสุดเบื้องหลังแบบเงียบๆ (ไม่แสดง HUD)
+            await viewModel.fetchCatalog(showHUD: false)
         }
         .onAppear {
-            // 🟢 เริ่มดักจับการเชื่อมต่อเครือข่ายเมื่อหน้าจอแสดงผล
             startNetworkMonitoring()
         }
         .onDisappear {
-            // 🟢 ยกเลิกการดักจับเมื่อออกจากหน้าจอ
             stopNetworkMonitoring()
         }
-        // 🟢 ตรวจจับเมื่อมีการสลับแอปกลับเข้ามาหน้าจอ (.active)
+        // 🟢 ตรวจจับเมื่อสลับแอปกลับเข้ามา (.active) แล้วดึงข้อมูลใหม่เบื้องหลังเงียบๆ
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
                 Task {
-                    // หากไม่ได้กำลังประมวลผล patch อยู่ ให้ดึงข้อมูล Patch Catalog ล่าสุดเบื้องหลัง (ไม่แสดง HUD รบกวน)
                     if viewModel.processingItemID == nil && !viewModel.isRestoringAll && !viewModel.isProcessingBatch {
                         await viewModel.fetchCatalog(force: true, showHUD: false)
                     }
@@ -215,8 +197,6 @@ struct QuickApplyView: View {
         monitor.pathUpdateHandler = { path in
             if path.status == .satisfied {
                 Task { @MainActor in
-                    // 🟢 เมื่ออินเทอร์เน็ตกลับมา และข้อมูล Patch ยังว่างอยู่
-                    // สั่งดึงข้อมูลแบบเบื้องหลังโดยส่ง showHUD: false เพื่อไม่ให้ HUD เด้งกวนผู้ใช้
                     if self.viewModel.displayedPatches.isEmpty && !self.viewModel.isLoadingCatalog {
                         await self.viewModel.fetchCatalog(showHUD: false)
                     }
