@@ -54,7 +54,7 @@ keys:
   downloadProgressFormatHundred: "Downloading... (100%)"
 
   # QuickApplyView System Icons (SF Symbols)
-  iconEmptyState: "square.stack.3d.up.slash"
+  iconEmptyState: "empty_patches_anim"
   iconCheckmarkCircle: "checkmark.circle"
   iconCircle: "circle"
   iconRefresh: "arrow.clockwise"
@@ -141,7 +141,7 @@ keys:
 
   # TargetGameView Localized UI Strings & System Icons
   iconAppWindowCheckmark: "app.window.checkmark"
-  iconNoGame: "bolt.horizontal"
+  iconNoGame: "empty_patches_anim"
   textSelectGameSection: "เลือกเกม"
   textHomeNavigationTitle: "หน้าแรก"
   textNoGamesFound: "ไม่พบรายการเกม"
