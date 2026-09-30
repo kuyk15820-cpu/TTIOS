@@ -75,7 +75,10 @@
 	<key>UIFileSharingEnabled</key>
 	<true/>
 
-		<key>UILaunchScreen</key>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+
+	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIImageName</key>
 		<string>AppIcon-1024</string>
