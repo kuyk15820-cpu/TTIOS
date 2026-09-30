@@ -23,6 +23,25 @@ class QuickApplyViewModel: ObservableObject {
 
     init(selectedApp: TargetGameApp) {
         self.selectedApp = selectedApp
+        
+        // 🟢 ดักรับสัญญาณ Real-time จาก Pusher (event: patch_updated -> RefreshCatalogPatches)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleCatalogUpdateNotification),
+            name: NSNotification.Name("RefreshCatalogPatches"),
+            object: nil
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func handleCatalogUpdateNotification() {
+        Task { @MainActor in
+            // 🟢 ดึงข้อมูล Catalog ใหม่ทันทีแบบ Background Refresh (ไม่แสดง HUD)
+            await self.fetchCatalog(force: true, showHUD: false)
+        }
     }
 
     // MARK: - Computed Properties
@@ -199,7 +218,10 @@ class QuickApplyViewModel: ObservableObject {
             if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
                 let items = try JSONDecoder().decode([QuickPatchItem].self, from: data)
 
-                self.patchItems = items
+                // 🟢 ใช้ withAnimation เพื่อให้หน้า UI เปลี่ยนรายการ Patch อย่างนุ่มนวล
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.patchItems = items
+                }
 
                 for item in items {
                     if let localURL = self.localPatchURL(for: item.id),
@@ -215,19 +237,25 @@ class QuickApplyViewModel: ObservableObject {
                 }
             } else {
                 // 🔴 HTTP Code ไม่ผ่าน ให้ล้างรายการทิ้ง
-                self.patchItems = []
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.patchItems = []
+                }
             }
         } catch {
             print("Fetch catalog failed: \(error)")
             // 🔴 ดึงข้อมูลล้มเหลว (เช่น ไม่พบเครือข่าย) ล้างข้อมูลออกเพื่อให้ View สลับไปหน้า Empty State
-            self.patchItems = []
+            withAnimation(.easeInOut(duration: 0.3)) {
+                self.patchItems = []
+            }
         }
 
         let elapsedTime = Date().timeIntervalSince(startTime)
-        let minDuration: TimeInterval = 1.0
-        if elapsedTime < minDuration {
-            let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: remainingTime)
+        let minDuration: TimeInterval = showHUD ? 1.0 : 0.0
+        let remainingTime = max(0, minDuration - elapsedTime)
+        
+        if remainingTime > 0 {
+            let remainingNano = UInt64(remainingTime * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: remainingNano)
         }
 
         self.isLoadingCatalog = false
