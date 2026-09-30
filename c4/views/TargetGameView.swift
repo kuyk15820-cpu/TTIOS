@@ -56,18 +56,6 @@ struct TargetGameView: View {
             }
             .navigationTitle(SecretKeys.textHomeNavigationTitle)
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                // 🟢 ปุ่มรีเฟรชที่มุมขวาบน
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        gameManager.fetchTargetGames(showHUD: true)
-                    } label: {
-                        Image(systemName: SecretKeys.iconRefresh)
-                    }
-                    .disabled(gameManager.isLoading)
-                    .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
-                }
-            }
             .navigationDestination(for: TargetGameApp.self) { app in
                 QuickApplyView(selectedApp: app)
             }
