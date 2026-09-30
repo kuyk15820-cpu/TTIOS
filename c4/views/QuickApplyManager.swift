@@ -49,10 +49,16 @@ class QuickApplyManager: ObservableObject {
             self.fetchHandler = customHandler
         }
         
-        // ถ้ามีข้อมูลอยู่แล้วและไม่ใช่การบังคับสั่งดึงใหม่ (force) ให้ข้ามได้เลย
-        if !patchItems.isEmpty && !force { return }
+        // 🟢 การันตีการเรียก Handler เสมอเมื่อ Early Return ป้องกัน Continuation ค้าง (Never Resumed)
+        if !patchItems.isEmpty && !force {
+            self.fetchHandler?(self.patchItems)
+            return
+        }
         
-        guard let url = URL(string: SecretKeys.catalogURL) else { return }
+        guard let url = URL(string: SecretKeys.catalogURL) else {
+            self.fetchHandler?(self.patchItems)
+            return
+        }
         
         DispatchQueue.main.async {
             self.isLoadingCatalog = true
@@ -102,11 +108,20 @@ class QuickApplyManager: ObservableObject {
         }.resume()
     }
     
-    // MARK: - Async Wrapper
+    // MARK: - Safe Async Wrapper (ป้องกัน Double Resume Crash)
     func fetchCatalog(force: Bool = false, showHUD: Bool = false) async {
         await withCheckedContinuation { continuation in
+            var isResumed = false
+            let lock = NSLock()
+            
             fetchCatalog(force: force, showHUD: showHUD) { _ in
-                continuation.resume()
+                lock.lock()
+                defer { lock.unlock() }
+                
+                if !isResumed {
+                    isResumed = true
+                    continuation.resume()
+                }
             }
         }
     }
