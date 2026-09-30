@@ -2,36 +2,26 @@ import SwiftUI
 import Network
 
 struct TargetGameView: View {
-    @StateObject private var updateManager = AppUpdateCheckerManager.shared
+    // 🟢 ดึงข้อมูลผ่าน TargetGameManager.shared
+    @StateObject private var gameManager = TargetGameManager.shared
 
     // 🟢 ตรวจจับ สถานะการทำงานของแอป (Active, Inactive, Background)
     @Environment(\.scenePhase) private var scenePhase
 
-    // เริ่มต้นเป็น Array ว่าง (ดึงข้อมูล Dynamic จาก Server)
-    @State private var targetApps: [TargetGameApp] = []
-    @State private var isLoading = false
-
     // 🟢 ตัว Monitor สำหรับตรวจจับการเชื่อมต่ออินเทอร์เน็ต
     @State private var networkMonitor: NWPathMonitor?
-
-    // 🟢 URL สำหรับดึงรายชื่อ Target Game จาก Server (ดึงผ่าน SecretKeys.targetGamesURL)
-    private let targetGamesURL = URL(string: SecretKeys.targetGamesURL)
 
     var body: some View {
         NavigationStack {
             Group {
-                if isLoading {
-                    // ขณะกำลังโหลดข้อมูล -> ซ่อน List ทั้งหมด
-                    Color.clear
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if targetApps.isEmpty {
-                    // 🟢 เรียกใช้ EmptyStateView แบบระบุ type: .noGames
+                if gameManager.targetApps.isEmpty {
+                    // 🟢 โชว์ Empty State เฉพาะกรณีที่ไม่มีรายการเกมจริงๆ
                     EmptyStateView(type: .noGames)
                 } else {
-                    // มีรายการเกม -> แสดง List
+                    // 🟢 แสดง List เสมอ (ไม่ซ่อน List แม้กำลังเช็คข้อมูลเบื้องหลัง)
                     List {
                         Section {
-                            ForEach(targetApps) { app in
+                            ForEach(gameManager.targetApps) { app in
                                 NavigationLink(value: app) {
                                     HStack(spacing: 12) {
                                         if let icon = app.icon {
@@ -61,16 +51,14 @@ struct TargetGameView: View {
             .navigationTitle(SecretKeys.textHomeNavigationTitle)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                // 🟢 ปุ่มรีเฟรชที่มุมขวาบน (ส่ง showHUD: true เพื่อแสดง HUD ตอนกดรีเฟรชเอง)
+                // 🟢 ปุ่มรีเฟรชที่มุมขวาบน
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        Task {
-                            await fetchTargetGames(showHUD: true)
-                        }
+                        gameManager.fetchTargetGames(showHUD: true)
                     } label: {
                         Image(systemName: SecretKeys.iconRefresh)
                     }
-                    .disabled(isLoading)
+                    .disabled(gameManager.isLoading)
                     .accessibilityLabel(SecretKeys.textAccessibilityRefresh)
                 }
             }
@@ -79,29 +67,16 @@ struct TargetGameView: View {
             }
         }
         .onAppear {
-            Task {
-                // 🟢 โหลดข้อมูลเมื่อเปิดหน้าจอขึ้นมา (showHUD เป็น false โดยดีฟอลต์)
-                await fetchTargetGames()
-            }
-            // 🟢 เริ่มต้นตรวจจับสถานะเครือข่าย
+            gameManager.fetchTargetGames()
             startNetworkMonitoring()
         }
         .onDisappear {
-            // 🟢 ปิด Monitor เมื่อออกจากหน้า เพื่อคืนทรัพยากร
             stopNetworkMonitoring()
         }
-        // 🟢 ตรวจจับเมื่อสลับแอปกลับเข้ามาหน้าจอหลัก (.active) แล้วโหลดข้อมูลใหม่เงียบๆ
+        // 🟢 ตรวจจับเมื่อสลับแอปกลับเข้ามา (.active) แล้วดึงข้อมูลใหม่แบบเงียบๆ
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
-                Task {
-                    await fetchTargetGames(showHUD: false)
-                }
-            }
-        }
-        // 🟢 รับสัญญาณจาก Pusher (เมื่อ PHP ยิง Event 'game_updated' มา) เพื่อรีเฟรชรายชื่อเกมทันที
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshTargetGames"))) { _ in
-            Task {
-                await fetchTargetGames(showHUD: false)
+                gameManager.fetchTargetGames(showHUD: false)
             }
         }
     }
@@ -115,9 +90,8 @@ struct TargetGameView: View {
         monitor.pathUpdateHandler = { path in
             if path.status == .satisfied {
                 Task { @MainActor in
-                    // 🟢 เมื่อเน็ตต่อติด และรายการเกมยังว่างอยู่ ให้โหลดข้อมูลให้อัตโนมัติทันที
-                    if self.targetApps.isEmpty && !self.isLoading {
-                        await self.fetchTargetGames(showHUD: false)
+                    if self.gameManager.targetApps.isEmpty && !self.gameManager.isLoading {
+                        self.gameManager.fetchTargetGames(showHUD: false)
                     }
                 }
             }
@@ -131,77 +105,6 @@ struct TargetGameView: View {
     private func stopNetworkMonitoring() {
         networkMonitor?.cancel()
         networkMonitor = nil
-    }
-
-    // MARK: - Fetch Dynamic Games from Server
-
-    private func fetchTargetGames(showHUD: Bool = false) async {
-        guard let url = targetGamesURL else { return }
-        
-        // 🟢 พ่วงแอบตรวจเช็คเวอร์ชันระบบไปด้วยทุกครั้งที่มีการดึงข้อมูลรายการเกม
-        updateManager.checkVersion()
-
-        await MainActor.run {
-            self.isLoading = true
-            if showHUD {
-                HUDHelper.show(message: "")
-            }
-        }
-
-        let startTime = Date()
-
-        do {
-            var request = URLRequest(
-                url: url,
-                // ป้องกันการดึงข้อมูลจาก Cache ทั้งฝั่ง Local และ Remote
-                cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
-                timeoutInterval: 15
-            )
-            request.httpMethod = "GET"
-            request.setValue(SecretKeys.userAgentValue, forHTTPHeaderField: SecretKeys.userAgentHeader)
-
-            // ใช้ URLSession.pinned เพื่อความปลอดภัยผ่าน SSL Pinning Delegate
-            let (data, response) = try await URLSession.pinned.data(for: request)
-            
-            if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
-                let decodedGames = try JSONDecoder().decode([TargetGameApp].self, from: data)
-                
-                // 🟢 กรองเอาเฉพาะเกมที่ active != false (ถ้าไม่ได้ส่งมาจะถือว่าเป็น true)
-                let activeGames = decodedGames.filter { $0.active ?? true }
-                
-                await MainActor.run {
-                    self.targetApps = activeGames
-                }
-            } else {
-                // หาก Status Code ไม่สำเร็จ ให้ล้างข้อมูลออก
-                await MainActor.run {
-                    self.targetApps = []
-                }
-            }
-        } catch {
-            print("Failed to fetch target games: \(error.localizedDescription)")
-            // หากเกิด Error (เช่น ปิดเน็ต/ไม่มีสัญญาณ) ให้ล้างข้อมูลเพื่อให้แสดง Empty State
-            await MainActor.run {
-                self.targetApps = []
-            }
-        }
-
-        // หากมีการแสดง HUD ให้การันตีการแสดงอย่างน้อย 1.0 วินาที เพื่อความสม่ำเสมอของ UI
-        if showHUD {
-            let elapsedTime = Date().timeIntervalSince(startTime)
-            let minDuration: TimeInterval = 1.0
-            if elapsedTime < minDuration {
-                let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: remainingTime)
-            }
-        }
-
-        await MainActor.run {
-            self.isLoading = false
-            if showHUD {
-                HUDHelper.hide()
-            }
-        }
     }
 }
 
