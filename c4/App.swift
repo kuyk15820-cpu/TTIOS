@@ -59,7 +59,7 @@ struct ThreeOneOSFiveApp: App {
                     .zIndex(998)
                 }
 
-                // 3. หน้า Splash Screen (แสดงผลค้างไว้จนกว่าจะเช็คเวอร์ชันสำเร็จ)
+                // 3. หน้า Splash Screen (แสดงผลค้างไว้จนกว่าจะเช็คเวอร์ชันและโหลดข้อมูลล่วงหน้าสำเร็จ)
                 if isCheckingUpdate {
                     AppSplashScreenView()
                         .transition(.opacity)
@@ -162,10 +162,22 @@ struct ThreeOneOSFiveApp: App {
         networkMonitor.start(queue: monitorQueue)
     }
 
-    // MARK: - Helper Function เช็คเวอร์ชันพร้อมหน่วงเวลา Splash Screen ขั้นต่ำ 1 วินาที
+    // MARK: - Helper Function เช็คเวอร์ชันพร้อมโหลดข้อมูล Target Games & Patches ล่วงหน้าก่อนปิด Splash Screen
     private func performUpdateCheck() {
         let startTime = Date()
         
+        // 🟢 1. Pre-fetch โหลดรายการเกม และรายการ Patch ล่วงหน้าเบื้องหลัง (ไม่แสดง HUD)
+        Task {
+            await TargetGameManager.shared.fetchTargetGames(showHUD: false)
+            
+            // ดึงรายการ Patch ของเกมแรกเตรียมไว้ใน Memory ล่วงหน้า (ถ้ามีเกมในระบบ)
+            if let firstGame = TargetGameManager.shared.targetApps.first {
+                let tempVM = QuickApplyViewModel(selectedApp: firstGame)
+                await tempVM.fetchCatalog(force: true, showHUD: false)
+            }
+        }
+        
+        // 🟢 2. เช็คเวอร์ชันแอปควบคู่กันไป
         AppUpdateCheckerManager.shared.checkVersion { needsUpdate, downloadUrl, releaseNotes, serverVersion in
             Task { @MainActor in
                 if serverVersion.isEmpty && !needsUpdate && downloadUrl == nil {
@@ -182,7 +194,7 @@ struct ThreeOneOSFiveApp: App {
                 
                 self.networkMonitor.cancel()
                 
-                // ปิด Splash Screen เพื่อเปิดหน้าแอป
+                // ปิด Splash Screen เพื่อเปิดเข้าหน้าแอปเมื่อข้อมูลพร้อมใช้งาน
                 withAnimation(.easeOut(duration: 0.3)) {
                     self.isCheckingUpdate = false
                 }
