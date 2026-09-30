@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 import Network
-import PusherSwift // 🟢 Import PusherSwift
+import PusherSwift
 
 @main
 struct ThreeOneOSFiveApp: App {
@@ -21,6 +21,9 @@ struct ThreeOneOSFiveApp: App {
     // ตัว Monitor ดักจับสถานะการเชื่อมต่ออินเทอร์เน็ต
     private let networkMonitor = NWPathMonitor()
     private let monitorQueue = DispatchQueue(label: "NetworkMonitorQueue")
+
+    // 🟢 Flag ป้องกันการยิงงานเช็คเน็ตซ้อนกันหลายรอบในเวลาอันสั้น
+    @State private var isNetworkCheckingInProgress = false
 
     // 🟢 ตัวแปรคุม Pusher
     @State private var pusher: Pusher?
@@ -145,17 +148,22 @@ struct ThreeOneOSFiveApp: App {
         self.pusher = pusherClient
     }
 
-    // MARK: - Network Monitoring Logic
+    // MARK: - Network Monitoring Logic (ปรับแก้เพื่อความปลอดภัย)
     private func startNetworkMonitoring() {
         networkMonitor.pathUpdateHandler = { path in
-            if path.status == .satisfied {
-                DispatchQueue.main.async {
-                    if self.isCheckingUpdate {
-                        self.performUpdateCheck()
-                    } else {
-                        // 🟢 ถ้าเน็ตเชื่อมต่อตอนกำลังใช้งาน ให้แอบเช็คเวอร์ชัน
-                        self.updateManager.checkVersion()
-                    }
+            guard path.status == .satisfied else { return }
+            
+            DispatchQueue.main.async {
+                // 🟢 ป้องกันการทำงานซ้อนถ้ากำลังเช็คเน็ตอยู่
+                guard !self.isNetworkCheckingInProgress else { return }
+                self.isNetworkCheckingInProgress = true
+                
+                if self.isCheckingUpdate {
+                    self.performUpdateCheck()
+                } else {
+                    // 🟢 ถ้าเน็ตเชื่อมต่อตอนกำลังใช้งาน ให้แอบเช็คเวอร์ชัน
+                    self.updateManager.checkVersion()
+                    self.isNetworkCheckingInProgress = false
                 }
             }
         }
@@ -175,19 +183,24 @@ struct ThreeOneOSFiveApp: App {
         // 🟢 2. เช็คเวอร์ชันแอปควบคู่กันไป
         AppUpdateCheckerManager.shared.checkVersion { needsUpdate, downloadUrl, releaseNotes, serverVersion in
             Task { @MainActor in
+                defer {
+                    // ปลดล็อกให้สั่งเช็คเน็ตใหม่ได้ในครั้งต่อไป
+                    self.isNetworkCheckingInProgress = false
+                }
+
                 if serverVersion.isEmpty && !needsUpdate && downloadUrl == nil {
                     return 
                 }
 
                 let elapsedTime = Date().timeIntervalSince(startTime)
-                let minDuration: TimeInterval = 1.0
+                let minDuration: TimeInterval = minDurationTimeInterval
                 
                 if elapsedTime < minDuration {
                     let remainingTime = UInt64((minDuration - elapsedTime) * 1_000_000_000)
                     try? await Task.sleep(nanoseconds: remainingTime)
                 }
                 
-                self.networkMonitor.cancel()
+                // 🟢 ไม่ใส่ networkMonitor.cancel() เพื่อให้ Monitor ยังทำงานต่อเวลามีการปิด/เปิดเน็ตในอนาคต
                 
                 // ปิด Splash Screen เพื่อเปิดเข้าหน้าแอปเมื่อข้อมูลพร้อมใช้งาน
                 withAnimation(.easeOut(duration: 0.3)) {
@@ -196,6 +209,8 @@ struct ThreeOneOSFiveApp: App {
             }
         }
     }
+    
+    private var minDurationTimeInterval: TimeInterval { 1.0 }
 }
 
 // MARK: - AppState
